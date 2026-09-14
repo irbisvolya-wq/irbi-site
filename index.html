@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111827" />
+  <title>IRBI — Чистота за вашим розкладом</title>
+  <meta name="description" content="IRBI — сервіс прибирання за вашим розкладом. Оберіть тип прибирання, зручний час та оформіть замовлення онлайн." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="container nav">
+      <a href="#top" class="brand" aria-label="IRBI">
+        <span class="brand-mark">I</span>
+        <span>IRBI</span>
+      </a>
+      <nav class="desktop-nav">
+        <a href="#how">Як це працює</a>
+        <a href="#services">Послуги</a>
+        <a href="#prices">Ціни</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="btn btn-ghost" id="openCabinet">Кабінет</button>
+        <a class="btn btn-primary" href="#order">Замовити</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">Сервіс прибирання нового покоління</div>
+          <h1>Чистота за вашим <span>розкладом</span></h1>
+          <p class="hero-text">
+            Оберіть прибирання, зручний час і адресу. IRBI підбере перевіреного клінерa, а ви зможете контролювати замовлення онлайн.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="#order">Розрахувати вартість</a>
+            <a class="btn btn-secondary btn-lg" href="#how">Як це працює</a>
+          </div>
+          <div class="trust-row">
+            <div><strong>4.9</strong><span>середня оцінка</span></div>
+            <div><strong>100%</strong><span>прозора ціна</span></div>
+            <div><strong>7 днів</strong><span>на тиждень</span></div>
+          </div>
+        </div>
+
+        <div class="hero-card">
+          <div class="hero-card-top">
+            <span>Наступне прибирання</span>
+            <span class="status">Заплановано</span>
+          </div>
+          <div class="hero-card-main">
+            <div class="calendar-box">
+              <span>ВТ</span>
+              <strong>15</strong>
+              <small>вересня</small>
+            </div>
+            <div>
+              <h3>Підтримувальне прибирання</h3>
+              <p>10:00 · 2 кімнати · 54 м²</p>
+              <p>Клінер буде призначений автоматично</p>
+            </div>
+          </div>
+          <div class="hero-card-price">
+            <span>Вартість</span>
+            <strong>1 090 ₴</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="how">
+      <div class="container">
+        <div class="section-head">
+          <span>Просто</span>
+          <h2>Три кроки — і вдома чисто</h2>
+        </div>
+        <div class="steps">
+          <article class="card">
+            <div class="step-num">01</div>
+            <h3>Оберіть послугу</h3>
+            <p>Тип прибирання, площу, кількість кімнат та додаткові опції.</p>
+          </article>
+          <article class="card">
+            <div class="step-num">02</div>
+            <h3>Оберіть час</h3>
+            <p>Вкажіть дату та часовий слот. Ми підберемо доступного клінерa.</p>
+          </article>
+          <article class="card">
+            <div class="step-num">03</div>
+            <h3>Отримайте результат</h3>
+            <p>Клінер завершує роботу, ви отримуєте сповіщення та підтверджуєте замовлення.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section soft" id="services">
+      <div class="container">
+        <div class="section-head">
+          <span>Послуги</span>
+          <h2>Прибирання під ваш ритм життя</h2>
+        </div>
+        <div class="services">
+          <article class="service-card active">
+            <div class="icon">✦</div>
+            <h3>Підтримувальне</h3>
+            <p>Регулярне прибирання квартири або будинку.</p>
+            <strong>від 790 ₴</strong>
+          </article>
+          <article class="service-card">
+            <div class="icon">⌂</div>
+            <h3>Генеральне</h3>
+            <p>Глибоке очищення кухні, санвузла та всіх поверхонь.</p>
+            <strong>від 1 590 ₴</strong>
+          </article>
+          <article class="service-card">
+            <div class="icon">◎</div>
+            <h3>Після ремонту</h3>
+            <p>Пил, будівельні сліди, складні забруднення.</p>
+            <strong>від 2 490 ₴</strong>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="order">
+      <div class="container order-layout">
+        <div>
+          <div class="section-head left">
+            <span>Онлайн-розрахунок</span>
+            <h2>Оформіть прибирання</h2>
+            <p>Ціна перераховується автоматично. Це демо-версія майбутнього оформлення замовлення IRBI.</p>
+          </div>
+
+          <form class="order-form" id="orderForm">
+            <div class="field">
+              <label for="cleaningType">Тип прибирання</label>
+              <select id="cleaningType">
+                <option value="regular">Підтримувальне</option>
+                <option value="general">Генеральне</option>
+                <option value="repair">Після ремонту</option>
+              </select>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label for="area">Площа, м²</label>
+                <input id="area" type="number" value="50" min="20" max="300">
+              </div>
+              <div class="field">
+                <label for="rooms">Кімнат</label>
+                <select id="rooms">
+                  <option value="1">1</option>
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                  <option value="4">4+</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Додатково</label>
+              <div class="addons">
+                <label class="check"><input type="checkbox" data-price="180" value="Вікна"> <span>Помити вікна</span><b>+180 ₴</b></label>
+                <label class="check"><input type="checkbox" data-price="150" value="Духовка"> <span>Помити духовку</span><b>+150 ₴</b></label>
+                <label class="check"><input type="checkbox" data-price="120" value="Холодильник"> <span>Помити холодильник</span><b>+120 ₴</b></label>
+                <label class="check"><input type="checkbox" data-price="100" value="Балкон"> <span>Прибрати балкон</span><b>+100 ₴</b></label>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label for="date">Дата</label>
+                <input id="date" type="date">
+              </div>
+              <div class="field">
+                <label for="time">Час</label>
+                <select id="time">
+                  <option>09:00</option>
+                  <option>11:00</option>
+                  <option>13:00</option>
+                  <option>15:00</option>
+                  <option>17:00</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="address">Адреса</label>
+              <input id="address" type="text" placeholder="Наприклад: вул. Шевченка, 24">
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label for="name">Ім’я</label>
+                <input id="name" type="text" placeholder="Ваше ім’я">
+              </div>
+              <div class="field">
+                <label for="phone">Телефон</label>
+                <input id="phone" type="tel" placeholder="+380 __ ___ __ __">
+              </div>
+            </div>
+
+            <label class="check subscription">
+              <input type="checkbox" id="subscription">
+              <span><strong>Регулярне прибирання</strong><small>Раз на тиждень — знижка 10%</small></span>
+              <b>−10%</b>
+            </label>
+
+            <button class="btn btn-primary btn-lg full" type="submit">Оформити замовлення</button>
+          </form>
+        </div>
+
+        <aside class="summary" id="prices">
+          <div class="summary-head">
+            <span>Ваше замовлення</span>
+            <span class="status neutral">Розрахунок</span>
+          </div>
+          <div class="summary-line">
+            <span>Прибирання</span>
+            <strong id="summaryType">Підтримувальне</strong>
+          </div>
+          <div class="summary-line">
+            <span>Площа</span>
+            <strong id="summaryArea">50 м²</strong>
+          </div>
+          <div class="summary-line">
+            <span>Кімнати</span>
+            <strong id="summaryRooms">2</strong>
+          </div>
+          <div class="summary-line">
+            <span>Додатково</span>
+            <strong id="summaryAddons">—</strong>
+          </div>
+          <div class="divider"></div>
+          <div class="summary-total">
+            <span>Разом</span>
+            <strong id="totalPrice">1 090 ₴</strong>
+          </div>
+          <small class="summary-note">Фінальна вартість у реальній версії буде підтверджена до оформлення замовлення.</small>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section dark">
+      <div class="container subscription-section">
+        <div>
+          <span class="eyebrow light">IRBI Regular</span>
+          <h2>Підписка на чистоту</h2>
+          <p>Один раз налаштовуєте графік — далі IRBI автоматично створює наступні прибирання.</p>
+        </div>
+        <div class="subscription-benefits">
+          <div><strong>−10%</strong><span>на кожне прибирання</span></div>
+          <div><strong>1×</strong><span>закріплений графік</span></div>
+          <div><strong>24/7</strong><span>керування в кабінеті</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="container faq-wrap">
+        <div class="section-head left">
+          <span>FAQ</span>
+          <h2>Часті питання</h2>
+        </div>
+        <div class="faq">
+          <details open>
+            <summary>Коли списуються гроші?</summary>
+            <p>У запланованій моделі клієнт прив’язує картку під час оформлення. Після завершення прибирання клінер відмічає роботу виконаною, після чого система запускає оплату.</p>
+          </details>
+          <details>
+            <summary>Хто приносить засоби та інвентар?</summary>
+            <p>У базовій моделі клінер приїжджає з погодженим набором професійної хімії та інвентарю.</p>
+          </details>
+          <details>
+            <summary>Чи можна перенести замовлення?</summary>
+            <p>Так. У майбутньому особистому кабінеті можна буде перенести або скасувати замовлення за правилами сервісу.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer">
+      <div>
+        <div class="brand footer-brand"><span class="brand-mark">I</span><span>IRBI</span></div>
+        <p>Чистота за вашим розкладом.</p>
+      </div>
+      <div>
+        <strong>Сервіс</strong>
+        <a href="#services">Послуги</a>
+        <a href="#order">Замовити</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div>
+        <strong>IRBI</strong>
+        <a href="#">Для клінерів</a>
+        <a href="#">Партнерам</a>
+        <a href="#">Контакти</a>
+      </div>
+    </div>
+  </footer>
+
+  <div class="modal" id="successModal" aria-hidden="true">
+    <div class="modal-card">
+      <button class="modal-close" data-close>×</button>
+      <div class="success-icon">✓</div>
+      <h3>Замовлення створено</h3>
+      <p id="successText">Демо-замовлення збережено на цьому пристрої.</p>
+      <button class="btn btn-primary full" data-close>Готово</button>
+    </div>
+  </div>
+
+  <div class="modal" id="cabinetModal" aria-hidden="true">
+    <div class="modal-card cabinet-card">
+      <button class="modal-close" data-close>×</button>
+      <div class="cabinet-head">
+        <div>
+          <span class="eyebrow">Особистий кабінет</span>
+          <h3>Мої замовлення</h3>
+        </div>
+      </div>
+      <div id="ordersList" class="orders-list"></div>
+      <p class="empty" id="emptyOrders">Поки що немає замовлень. Оформіть перше прибирання на сайті.</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
