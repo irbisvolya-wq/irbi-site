@@ -1,132 +1,121 @@
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => [...document.querySelectorAll(s)];
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 const pricing = {
-  regular: { name: "Підтримувальне", base: 590, perM2: 10 },
-  general: { name: "Генеральне", base: 990, perM2: 18 },
-  repair: { name: "Після ремонту", base: 1490, perM2: 24 }
+  regular: { name: "Підтримувальне", prices: { 1: 1200, 2: 1500, 3: 1800, 4: 2200 } },
+  general: { name: "Генеральне", prices: { 1: 2500, 2: 3200, 3: 3900, 4: 4700 } },
+  move: { name: "Заселення / виселення", prices: { 1: 2900, 2: 3700, 3: 4500, 4: 5400 } },
+  repair: { name: "Після ремонту", prices: { 1: 3000, 2: 4000, 3: 5000, 4: null } }
 };
 
-const cleaningType = $("#cleaningType");
-const area = $("#area");
+const serviceType = $("#serviceType");
 const rooms = $("#rooms");
-const subscription = $("#subscription");
 const totalPrice = $("#totalPrice");
-const summaryType = $("#summaryType");
-const summaryArea = $("#summaryArea");
+const summaryService = $("#summaryService");
 const summaryRooms = $("#summaryRooms");
 const summaryAddons = $("#summaryAddons");
+const summaryWarning = $("#summaryWarning");
 
-function calc() {
-  const type = pricing[cleaningType.value];
-  const m2 = Math.max(20, Number(area.value || 20));
+function formatMoney(value) {
+  return new Intl.NumberFormat("uk-UA").format(value) + " ₴";
+}
+
+function calculate() {
+  const service = pricing[serviceType.value];
   const roomCount = Number(rooms.value);
-  let total = type.base + m2 * type.perM2 + Math.max(0, roomCount - 1) * 90;
-
+  let base = service.prices[roomCount];
+  let total = base || 0;
   const selected = [];
-  $$("input[type=\"checkbox\"][data-price]").forEach((el) => {
-    if (el.checked) {
-      total += Number(el.dataset.price);
-      selected.push(el.value);
+
+  const moveInOut = serviceType.value === "move";
+  $$("[data-addon]").forEach((checkbox) => {
+    const isIncluded = moveInOut && checkbox.dataset.addon === "balcony";
+    checkbox.disabled = isIncluded;
+
+    const card = checkbox.closest(".check");
+    if (card) {
+      card.style.opacity = isIncluded ? "0.55" : "1";
+      const priceLabel = card.querySelector("b");
+      if (priceLabel && checkbox.dataset.addon === "balcony") {
+        priceLabel.textContent = isIncluded ? "включено" : "від +300 ₴";
+      }
+    }
+
+    if (isIncluded) {
+      checkbox.checked = false;
+      return;
+    }
+
+    if (checkbox.checked) {
+      total += Number(checkbox.dataset.price || 0);
+      selected.push(checkbox.nextElementSibling?.textContent?.trim() || "Додаткова робота");
     }
   });
 
-  if (subscription.checked) total *= 0.9;
-  total = Math.round(total / 10) * 10;
-
-  summaryType.textContent = type.name;
-  summaryArea.textContent = `${m2} м²`;
-  summaryRooms.textContent = rooms.options[rooms.selectedIndex].text;
+  summaryService.textContent = service.name;
+  summaryRooms.textContent = roomCount;
   summaryAddons.textContent = selected.length ? selected.join(", ") : "—";
-  totalPrice.textContent = `${total.toLocaleString("uk-UA")} ₴`;
-  return total;
-}
 
-[cleaningType, area, rooms, subscription, ...$$("input[type=\"checkbox\"][data-price]")]
-  .forEach(el => el.addEventListener("input", calc));
-
-const dateInput = $("#date");
-const today = new Date();
-const tomorrow = new Date(today);
-tomorrow.setDate(today.getDate() + 1);
-dateInput.min = today.toISOString().split("T")[0];
-dateInput.value = tomorrow.toISOString().split("T")[0];
-
-function openModal(id){
-  const modal = document.getElementById(id);
-  modal.classList.add("show");
-  modal.setAttribute("aria-hidden","false");
-}
-function closeModal(modal){
-  modal.classList.remove("show");
-  modal.setAttribute("aria-hidden","true");
-}
-$$("[data-close]").forEach(btn => btn.addEventListener("click", () => closeModal(btn.closest(".modal"))));
-$$(".modal").forEach(m => m.addEventListener("click", e => { if(e.target === m) closeModal(m); }));
-
-function loadOrders(){
-  return JSON.parse(localStorage.getItem("irbiOrders") || "[]");
-}
-function saveOrders(items){
-  localStorage.setItem("irbiOrders", JSON.stringify(items));
-}
-function renderOrders(){
-  const items = loadOrders();
-  const list = $("#ordersList");
-  const empty = $("#emptyOrders");
-  list.innerHTML = "";
-  empty.style.display = items.length ? "none" : "block";
-  items.slice().reverse().forEach(order => {
-    const node = document.createElement("div");
-    node.className = "order-item";
-    node.innerHTML = `
-      <div class="order-item-top">
-        <strong>${order.type}</strong>
-        <span class="status">Заплановано</span>
-      </div>
-      <p>${order.date} · ${order.time}<br>${order.address}</p>
-      <small>${order.area} м² · ${order.rooms} кімн. · ${order.price.toLocaleString("uk-UA")} ₴</small>
-    `;
-    list.appendChild(node);
-  });
-}
-
-$("#openCabinet").addEventListener("click", () => {
-  renderOrders();
-  openModal("cabinetModal");
-});
-
-$("#orderForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const address = $("#address").value.trim();
-  const name = $("#name").value.trim();
-  const phone = $("#phone").value.trim();
-
-  if (!address || !name || !phone) {
-    alert("Будь ласка, заповніть адресу, ім’я та телефон.");
-    return;
+  if (base === null) {
+    totalPrice.textContent = "Індивідуально";
+    summaryWarning.textContent = "Для 4-кімнатного житла після ремонту вартість визначається після оцінки обсягу робіт.";
+  } else {
+    totalPrice.textContent = serviceType.value === "repair" ? "від " + formatMoney(total) : formatMoney(total);
+    summaryWarning.textContent = "Фінальна ціна підтверджуватиметься до оформлення замовлення.";
   }
+}
 
-  const order = {
-    id: Date.now(),
-    type: pricing[cleaningType.value].name,
-    area: Number(area.value),
-    rooms: Number(rooms.value),
-    date: $("#date").value,
-    time: $("#time").value,
-    address,
-    name,
-    phone,
-    subscription: subscription.checked,
-    price: calc()
-  };
-
-  const orders = loadOrders();
-  orders.push(order);
-  saveOrders(orders);
-
-  $("#successText").textContent = `Замовлення на ${order.date} о ${order.time} створено. Вартість: ${order.price.toLocaleString("uk-UA")} ₴.`;
-  openModal("successModal");
+[serviceType, rooms, ...$$("[data-addon]")].forEach((el) => {
+  el.addEventListener("change", calculate);
 });
 
-calc();
+function openModal() {
+  const modal = $("#interestModal");
+  modal.classList.add("show");
+  modal.setAttribute("aria-hidden", "false");
+  $("#interestName")?.focus();
+}
+
+function closeModal() {
+  const modal = $("#interestModal");
+  modal.classList.remove("show");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+$("#openInterest")?.addEventListener("click", openModal);
+$("#openInterestBottom")?.addEventListener("click", openModal);
+$("[data-close]")?.addEventListener("click", closeModal);
+$("#interestModal")?.addEventListener("click", (event) => {
+  if (event.target.id === "interestModal") closeModal();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeModal();
+});
+
+$("#interestForm")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const name = $("#interestName").value.trim();
+  const contact = $("#interestContact").value.trim();
+  if (!name || !contact) return;
+
+  const leads = JSON.parse(localStorage.getItem("irbiPrelaunchInterest") || "[]");
+  leads.push({
+    id: Date.now(),
+    name,
+    contact,
+    createdAt: new Date().toISOString(),
+    source: "website_prelaunch"
+  });
+  localStorage.setItem("irbiPrelaunchInterest", JSON.stringify(leads));
+
+  $("#interestSuccess").hidden = false;
+  $("#interestForm").reset();
+
+  window.setTimeout(() => {
+    $("#interestSuccess").hidden = true;
+  }, 3500);
+});
+
+calculate();
