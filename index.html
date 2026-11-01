@@ -262,7 +262,7 @@
         <div>
           <span class="eyebrow">IRBI · prelaunch</span>
           <h2>Хочете дізнатися, коли ми відкриємо замовлення?</h2>
-          <p>Залиште контакт у демо-формі. Поки що дані зберігаються лише у вашому браузері — форму підключимо до CRM на наступному етапі.</p>
+          <p>Залиште контакт, щоб отримати повідомлення про відкриття IRBI. Це ще не оформлення замовлення.</p>
         </div>
         <button class="btn btn-primary btn-lg" id="openInterestBottom">Залишити контакт</button>
       </div>
@@ -294,13 +294,13 @@
       <button class="modal-close" type="button" data-close aria-label="Закрити">×</button>
       <span class="eyebrow">Ранній доступ</span>
       <h3>Повідомити про запуск IRBI</h3>
-      <p>Це демо-форма до підключення HubSpot. Контакт тимчасово зберігається лише у вашому браузері.</p>
+      <p>Залиште контакт для раннього доступу. Замовлення поки не приймаються.</p>
       <form id="interestForm" class="interest-form">
         <label class="field"><span>Ім’я</span><input id="interestName" type="text" required placeholder="Ваше ім’я"></label>
         <label class="field"><span>Телефон або email</span><input id="interestContact" type="text" required placeholder="+380… або email"></label>
-        <button class="btn btn-primary full" type="submit">Зберегти</button>
+        <div style="position:absolute;left:-9999px" aria-hidden="true"><label>Сайт<input id="interestWebsite" type="text" tabindex="-1" autocomplete="off"></label></div>\n        <label class="check"><input id="privacyAccepted" type="checkbox" required><span>Погоджуюсь на обробку контактних даних для відповіді на заявку.</span></label>\n        <label class="check"><input id="marketingConsent" type="checkbox"><span>Хочу отримати повідомлення про запуск та пропозиції IRBI (необов’язково).</span></label>\n        <p id="interestStatus" role="status" aria-live="polite"></p>\n        <button class="btn btn-primary full" type="submit">Надіслати заявку</button>
       </form>
-      <div class="success-box" id="interestSuccess" hidden>Готово. Контакт збережено локально для демо.</div>
+      <div class="success-box" id="interestSuccess" hidden>Дякуємо! Заявку отримано. Це не бронювання прибирання.</div>
     </div>
   </div>
 
