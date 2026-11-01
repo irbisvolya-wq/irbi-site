@@ -93,29 +93,39 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeModal();
 });
 
-$("#interestForm")?.addEventListener("submit", (event) => {
+$("#interestForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
-
-  const name = $("#interestName").value.trim();
-  const contact = $("#interestContact").value.trim();
-  if (!name || !contact) return;
-
-  const leads = JSON.parse(localStorage.getItem("irbiPrelaunchInterest") || "[]");
-  leads.push({
-    id: Date.now(),
-    name,
-    contact,
-    createdAt: new Date().toISOString(),
-    source: "website_prelaunch"
-  });
-  localStorage.setItem("irbiPrelaunchInterest", JSON.stringify(leads));
-
-  $("#interestSuccess").hidden = false;
-  $("#interestForm").reset();
-
-  window.setTimeout(() => {
-    $("#interestSuccess").hidden = true;
-  }, 3500);
+  const form = $("#interestForm");
+  const button = form.querySelector('button[type="submit"]');
+  const success = $("#interestSuccess");
+  const status = $("#interestStatus");
+  const payload = {
+    name: $("#interestName").value.trim(),
+    contact: $("#interestContact").value.trim(),
+    privacyAccepted: $("#privacyAccepted").checked,
+    marketingConsent: $("#marketingConsent").checked,
+    website: $("#interestWebsite").value,
+    service: serviceType.value,
+    rooms: Number(rooms.value),
+    requestId: form.dataset.requestId || crypto.randomUUID()
+  };
+  if (!payload.privacyAccepted) { status.textContent = "Підтвердіть ознайомлення з умовами обробки даних."; return; }
+  form.dataset.requestId = payload.requestId;
+  button.disabled = true;
+  status.textContent = "Надсилаємо заявку…";
+  try {
+    const response = await fetch("https://xcfbzlyososeetbnrvhf.supabase.co/functions/v1/irbi-prelaunch-lead", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("Не вдалося зберегти заявку");
+    success.hidden = false;
+    status.textContent = "";
+    form.reset();
+    delete form.dataset.requestId;
+    window.setTimeout(() => { success.hidden = true; }, 6000);
+  } catch {
+    status.textContent = "Заявку не вдалося надіслати. Спробуйте ще раз пізніше.";
+  } finally { button.disabled = false; }
 });
 
 calculate();
