@@ -8,6 +8,7 @@ function toggleMode(register){
  $("#authTitle").textContent=register?"Створити акаунт IRBI":"Увійти в IRBI";
  $("#submitAuth").textContent=register?"Зареєструватися":"Увійти";
  $("#nameLabel").classList.toggle("hidden",!register);
+ $("#phoneLabel").classList.toggle("hidden",!register);
  $("#fullName").required=register;
  $("#password").autocomplete=register?"new-password":"current-password";
  $("#authMessage").textContent="";
@@ -37,7 +38,7 @@ $("#authForm").onsubmit=async e=>{
    if(full_name.length<2)throw new Error("Вкажіть ім’я (щонайменше 2 символи).");
    const {data,error}=await supabase.auth.signUp({
     email,password,
-    options:{data:{full_name},emailRedirectTo:location.origin+"/portal.html"}
+    options:{data:{full_name,phone:$("#phone").value.trim()||null},emailRedirectTo:location.origin+"/portal.html"}
    });
    if(error)throw error;
    $("#authMessage").textContent=data.session?"Реєстрацію завершено.":"Перевірте пошту й підтвердьте адресу для входу.";
