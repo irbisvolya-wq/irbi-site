@@ -38,7 +38,7 @@ async function render(){
 }
 async function renderMonthly(){
  const period=$("#month").value;
- if(!/^\\d{4}-\\d{2}$/.test(period))return;
+ if(!/^\d{4}-\d{2}$/.test(period))return;
  const {data,error}=await db.from("irbi_monthly_finance").select("*").eq("month_start",period+"-01").maybeSingle();
  if(error){message("Місячний звіт недоступний: "+error.message);return;}
  const d=data||{};
