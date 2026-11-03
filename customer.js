@@ -39,7 +39,7 @@ async function loadHistory(userId){
  if(!data?.length){note("Заявок поки немає.");return;}
  note("Показано до 100 останніх заявок.");
  for(const b of data){
-  const article=document.createElement("article");article.style.cssText="border:1px solid #d6e5dc;border-radius:12px;padding:14px;margin:12px 0";
+  const article=document.createElement("article");article.id="order-"+b.id;article.style.cssText="border:1px solid #d6e5dc;border-radius:12px;padding:14px;margin:12px 0";
   const details=document.createElement("details");
   const summary=document.createElement("summary");summary.style.cursor="pointer";
   summary.textContent=(services[b.service_type]||b.service_type||"Прибирання")+" · "+date(b.scheduled_at)+" · "+(labels[b.status]||b.status)+" · "+money(b.total);
@@ -73,7 +73,30 @@ async function loadHistory(userId){
    };
    actions.append(cancel);
   }
-  body.append(actions);details.append(body);article.append(details);root.append(article);
+  body.append(actions);
+  const chat=document.createElement("section");chat.style.cssText="margin-top:16px;border-top:1px solid #bed7c8;padding-top:12px";
+  const chatHeading=document.createElement("h4");chatHeading.textContent="Повідомлення по заявці";chat.append(chatHeading);
+  const chatStatus=document.createElement("p");chatStatus.setAttribute("role","status");
+  const history=document.createElement("div");chat.append(chatStatus,history);
+  const form=document.createElement("form"),input=document.createElement("textarea"),send=document.createElement("button");
+  input.rows=3;input.maxLength=2000;input.required=true;input.placeholder="Ваше запитання команді IRBI";input.style.cssText="width:100%;max-width:100%;padding:10px";
+  send.type="submit";send.className="btn btn-primary";send.textContent="Надіслати повідомлення";form.append(input,send);
+  async function refreshChat(){
+   const {data,error}=await db.from("irbi_booking_messages").select("sender_id,audience,body,created_at").eq("booking_id",b.id).order("created_at",{ascending:true}).limit(100);
+   if(error){chatStatus.textContent=error.message;return;}
+   history.replaceChildren();chatStatus.textContent=data?.length?"":"Повідомлень ще немає.";
+   for(const m of data||[]){const p=document.createElement("p");p.style.cssText="padding:9px;border-radius:8px;background:#eaf4ed;margin:8px 0";p.textContent=(m.audience==="staff"?"Ви":"Команда IRBI")+" · "+date(m.created_at)+" — "+m.body;history.append(p);}
+  }
+  details.addEventListener("toggle",()=>{if(details.open)refreshChat();});
+  form.addEventListener("submit",async e=>{
+   e.preventDefault();if(!input.value.trim())return;send.disabled=true;
+   const {error}=await db.rpc("irbi_send_booking_message",{p_booking:b.id,p_body:input.value.trim()});
+   send.disabled=false;
+   if(error){chatStatus.textContent="Помилка: "+error.message;return;}
+   input.value="";await refreshChat();
+  });
+  chat.append(form);body.append(chat);
+  details.append(body);article.append(details);root.append(article);
  }
 }
 $("#customerProfileForm").addEventListener("submit",async e=>{
