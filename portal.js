@@ -2,11 +2,83 @@ import {createClient} from "https://esm.sh/@supabase/supabase-js@2.95.0";
 const supabase=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publishable_FeIEDPRGGRrp42q6mT3ACA_JvHSrhS1",{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=s=>document.querySelector(s);
 let mode="login";
-function toggleMode(register){mode=register?"register":"login";$("#authTitle").textContent=register?"Реєстрація клієнта":"Увійти";$("#submitAuth").textContent=register?"Створити акаунт":"Увійти";$("#nameLabel").classList.toggle("hidden",!register);$("#fullName").required=register;$("#password").autocomplete=register?"new-password":"current-password";$("#authMessage").textContent="";}
-$("#showLogin").onclick=()=>toggleMode(false);$("#showRegister").onclick=()=>toggleMode(true);
-$("#authForm").onsubmit=async e=>{e.preventDefault();const email=$("#email").value.trim(),password=$("#password").value;$("#submitAuth").disabled=true;$("#authMessage").textContent="Перевіряємо дані…";try{if(mode==="register"){const full_name=$("#fullName").value.trim();if(full_name.length<2)throw new Error("Вкажіть ім’я.");const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name},emailRedirectTo:location.origin+"/portal.html"}});if(error)throw error;$("#authMessage").textContent=data.session?"Акаунт створено.":"Перевірте вашу пошту для підтвердження реєстрації.";}else{const {error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;$("#authMessage").textContent="Вхід успішний.";}}catch(err){$("#authMessage").textContent=err.message||"Помилка входу";}finally{$("#submitAuth").disabled=false;}};
-$("#logout").onclick=async()=>{await supabase.auth.signOut();location.replace("/portal.html");};
-async function render(){const {data:{user}}=await supabase.auth.getUser();$("#authPanel").classList.toggle("hidden",!!user);$("#dashboard").classList.toggle("hidden",!user);if(!user)return;const {data:profile,error:profileError}=await supabase.from("profiles").select("id,full_name,role").eq("id",user.id).maybeSingle();if(profileError){$("#roleNotice").textContent="Помилка перевірки ролі. Зверніться до підтримки.";return;}const role=["customer","cleaner","dispatcher","admin"].includes(profile?.role)?profile.role:"customer";const financeLink=document.querySelector("#financeLink");if(financeLink)financeLink.remove();if(role==="admin"){let staffLink=document.querySelector("#staffLink");if(!staffLink){staffLink=document.createElement("a");staffLink.id="staffLink";staffLink.href="/staff.html";staffLink.className="btn btn-secondary";staffLink.textContent="Персонал і виплати";document.querySelector("#dashboard").prepend(staffLink);}const link=document.createElement("a");link.id="financeLink";link.href="/finance.html";link.className="btn btn-primary";link.textContent="Економіка замовлень";document.querySelector("#dashboard").prepend(link);}$("#dashboardTitle").textContent=role==="admin"?"Панель адміністратора":role==="dispatcher"?"Панель координатора":role==="cleaner"?"Кабінет клінера":"Кабінет клієнта";$("#accountInfo").textContent=(profile?.full_name||user.email)+" · "+user.email;$("#roleNotice").textContent=role==="admin"||role==="dispatcher"?"Перегляд замовлень. Редагування, призначення виконавців та фінансові операції будуть доступні після окремого захищеного впровадження.":role==="cleaner"?"Ваші призначені замовлення. Управління статусами та чек-листами ще впроваджується.":"Ваші замовлення. Онлайн-бронювання ще готується до запуску.";$("#ordersTitle").textContent=role==="cleaner"?"Призначені замовлення":role==="admin"||role==="dispatcher"?"Замовлення компанії":"Мої замовлення";$("#ordersStatus").textContent="Завантаження…";let query=supabase.from("bookings").select("id,scheduled_at,status,total,assigned_cleaner_id,service_type,rooms,bathrooms,area_m2,property_type,address,apartment,entrance,floor,contact_phone,created_at,cleaning_features,photo_consent,duration_minutes,scheduled_end_at").order("created_at",{ascending:false}).limit(50);if(role==="cleaner")query=query.eq("assigned_cleaner_id",user.id);if(role==="customer")query=query.eq("customer_id",user.id);const {data:orders,error}=await query;if(error){$("#ordersStatus").textContent="Немає доступу до даних або помилка завантаження.";return;}$("#ordersBody").replaceChildren();for(const order of orders||[]){const tr=document.createElement("tr");for(const item of [order.id.slice(0,8),order.scheduled_at?new Date(order.scheduled_at).toLocaleString("uk-UA"):"—",order.status,order.total==null?"—":order.total+" ₴"]){const td=document.createElement("td");td.textContent=item;tr.append(td);}$("#ordersBody").append(tr);}$("#ordersStatus").textContent=orders?.length?"":"Поки немає замовлень.";if(role!=="customer") await staffPanel(role,user,orders||[]);}
+let recovering=false;
+function toggleMode(register){
+ mode=register?"register":"login";
+ $("#authTitle").textContent=register?"Створити акаунт IRBI":"Увійти в IRBI";
+ $("#submitAuth").textContent=register?"Зареєструватися":"Увійти";
+ $("#nameLabel").classList.toggle("hidden",!register);
+ $("#fullName").required=register;
+ $("#password").autocomplete=register?"new-password":"current-password";
+ $("#authMessage").textContent="";
+}
+$("#showLogin").onclick=()=>toggleMode(false);
+$("#showRegister").onclick=()=>toggleMode(true);
+$("#forgotPassword").onclick=async()=>{
+ const email=$("#email").value.trim();
+ if(!email||!$("#email").checkValidity()){
+  $("#authMessage").textContent="Спочатку введіть електронну пошту.";$("#email").focus();return;
+ }
+ $("#forgotPassword").disabled=true;
+ try{
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin+"/portal.html"});
+  if(error)throw error;
+  $("#authMessage").textContent="Якщо адреса зареєстрована, надішлемо лист для відновлення пароля.";
+ }catch(err){$("#authMessage").textContent=err.message||"Не вдалося надіслати лист.";}
+ finally{$("#forgotPassword").disabled=false;}
+};
+$("#authForm").onsubmit=async e=>{
+ e.preventDefault();
+ const email=$("#email").value.trim(),password=$("#password").value,btn=$("#submitAuth");
+ btn.disabled=true;$("#authMessage").textContent="Зачекайте, перевіряємо дані…";
+ try{
+  if(mode==="register"){
+   const full_name=$("#fullName").value.trim();
+   if(full_name.length<2)throw new Error("Вкажіть ім’я (щонайменше 2 символи).");
+   const {data,error}=await supabase.auth.signUp({
+    email,password,
+    options:{data:{full_name},emailRedirectTo:location.origin+"/portal.html"}
+   });
+   if(error)throw error;
+   $("#authMessage").textContent=data.session?"Реєстрацію завершено.":"Перевірте пошту й підтвердьте адресу для входу.";
+  }else{
+   const {error}=await supabase.auth.signInWithPassword({email,password});
+   if(error)throw error;
+   $("#authMessage").textContent="Вхід виконано.";
+  }
+ }catch(err){$("#authMessage").textContent=err.message||"Помилка авторизації";}
+ finally{btn.disabled=false;}
+};
+$("#logout").onclick=async()=>{const {error}=await supabase.auth.signOut();if(error){$("#roleNotice").textContent=error.message;return;}location.replace("/portal.html");};
+$("#resetForm").onsubmit=async e=>{
+ e.preventDefault();
+ const pass=$("#resetPassword").value,confirmPass=$("#resetConfirm").value,btn=$("#saveResetPassword");
+ if(pass!==confirmPass){$("#resetMessage").textContent="Паролі не збігаються.";return;}
+ if(pass.length<8){$("#resetMessage").textContent="Пароль повинен містити щонайменше 8 символів.";return;}
+ btn.disabled=true;
+ const {error}=await supabase.auth.updateUser({password:pass});
+ btn.disabled=false;
+ if(error){$("#resetMessage").textContent=error.message;return;}
+ recovering=false;
+ $("#resetPanel").classList.add("hidden");
+ $("#resetMessage").textContent="";
+ await supabase.auth.signOut();
+ $("#authPanel").classList.remove("hidden");
+ $("#authMessage").textContent="Пароль оновлено. Увійдіть з новим паролем.";
+};
+supabase.auth.onAuthStateChange((event)=>{
+ if(event==="PASSWORD_RECOVERY"){
+  recovering=true;
+  $("#resetPanel").classList.remove("hidden");
+  $("#authPanel").classList.add("hidden");
+  $("#dashboard").classList.add("hidden");
+  $("#resetPassword").focus();
+ }
+});
+async function render(){const {data:{user}}=await supabase.auth.getUser();$("#authPanel").classList.toggle("hidden",!!user);$("#dashboard").classList.toggle("hidden",!user||recovering);$("#resetPanel").classList.toggle("hidden",!recovering);if(recovering){$("#authPanel").classList.add("hidden");return;}if(!user)return;const {data:profile,error:profileError}=await supabase.from("profiles").select("id,full_name,role").eq("id",user.id).maybeSingle();if(profileError){$("#roleNotice").textContent="Помилка перевірки ролі. Зверніться до підтримки.";return;}const role=["customer","cleaner","dispatcher","admin"].includes(profile?.role)?profile.role:"customer";$("#staffNav").classList.toggle("hidden",role==="customer");
+$("#staffManagementLink").classList.toggle("hidden",role!=="admin");
+$("#financeManagementLink").classList.toggle("hidden",role!=="admin");
+$("#dashboardTitle").textContent=role==="admin"?"Панель адміністратора":role==="dispatcher"?"Панель координатора":role==="cleaner"?"Кабінет клінера":"Кабінет клієнта";$("#accountInfo").textContent=(profile?.full_name||user.email)+" · "+user.email;$("#roleNotice").textContent=role==="admin"||role==="dispatcher"?"Керуйте робочими замовленнями та графіком. Фінанси й персонал доступні лише адміністратору.":role==="cleaner"?"Тут ваші призначені роботи, статуси та чек-листи.":"Ваші замовлення. Онлайн-бронювання ще готується до запуску.";$("#ordersTitle").textContent=role==="cleaner"?"Призначені замовлення":role==="admin"||role==="dispatcher"?"Замовлення компанії":"Мої замовлення";$("#ordersStatus").textContent="Завантаження…";let query=supabase.from("bookings").select("id,scheduled_at,status,total,assigned_cleaner_id,service_type,rooms,bathrooms,area_m2,property_type,address,apartment,entrance,floor,contact_phone,created_at,cleaning_features,photo_consent,duration_minutes,scheduled_end_at").order("created_at",{ascending:false}).limit(50);if(role==="cleaner")query=query.eq("assigned_cleaner_id",user.id);if(role==="customer")query=query.eq("customer_id",user.id);const {data:orders,error}=await query;if(error){$("#ordersStatus").textContent="Немає доступу до даних або помилка завантаження.";return;}$("#ordersBody").replaceChildren();for(const order of orders||[]){const tr=document.createElement("tr");for(const item of [order.id.slice(0,8),order.scheduled_at?new Date(order.scheduled_at).toLocaleString("uk-UA"):"—",order.status,order.total==null?"—":order.total+" ₴"]){const td=document.createElement("td");td.textContent=item;tr.append(td);}$("#ordersBody").append(tr);}$("#ordersStatus").textContent=orders?.length?"":"Поки немає замовлень.";if(role!=="customer") await staffPanel(role,user,orders||[]);}
 supabase.auth.onAuthStateChange(()=>{setTimeout(render,0);});render();
 const panel=document.createElement("div");panel.className="portal-card";panel.id="staffPanel";$("#dashboard").append(panel);
 const statusNext={assigned:["accept","Прийняти"],accepted:["depart","Виїхав"],en_route:["arrive","На місці"],arrived:["start","Почати"],in_progress:["finish","Завершити"]};
