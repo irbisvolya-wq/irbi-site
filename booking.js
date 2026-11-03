@@ -37,6 +37,20 @@ async function init(){
  const {data:profile,error:pe}=await db.from("profiles").select("role,phone").eq("id",user.id).maybeSingle();
  if(pe||profile?.role!=="customer"){message("Запити на прибирання оформлюються з клієнтського кабінету.");return;}
  $("#phone").value=profile?.phone||"";
+ const repeatId=new URLSearchParams(location.search).get("repeat");
+ if(repeatId){
+  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(repeatId)){message("Некоректний номер повторюваної заявки.");return;}
+  const {data:previous,error:repeatError}=await db.from("bookings")
+   .select("service_type,rooms,property_type,bathrooms,area_m2,address,apartment,entrance,floor,access_notes,contact_phone,frequency,cleaning_features")
+   .eq("id",repeatId).eq("customer_id",user.id).maybeSingle();
+  if(repeatError||!previous){message("Попередню заявку не знайдено. Можна оформити нову вручну.");}
+  else {
+   const fields={service:previous.service_type,rooms:previous.rooms,propertyType:previous.property_type,bathrooms:previous.bathrooms,area:previous.area_m2,address:previous.address,apartment:previous.apartment,entrance:previous.entrance,floor:previous.floor,notes:previous.access_notes,phone:previous.contact_phone,frequency:previous.frequency};
+   for(const [key,value] of Object.entries(fields)){if(value!==null&&value!==undefined&&$("#"+key))$("#"+key).value=String(value);}
+   for(const key of ["balcony","fridge","oven","cabinets"])$("#"+key).checked=previous.cleaning_features?.requested_addons?.[key]===true;
+   message("Дані попередньої заявки перенесено. Оберіть нові дату й час.");
+  }
+ }
  $("#content").classList.remove("hide");message("Заповніть дані для запиту.");
  const tomorrow=new Date(Date.now()+12*3600*1000+60000);const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000);
  $("#scheduled").min=local.toISOString().slice(0,16);quote();
