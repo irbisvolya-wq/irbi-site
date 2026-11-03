@@ -69,8 +69,7 @@ async function loadHistory(userId){
     cancel.disabled=true;note("Скасовуємо заявку…");
     const {error}=await db.rpc("irbi_customer_cancel_request",{p_booking:b.id});
     if(error){note("Скасування не виконано: "+error.message);cancel.disabled=false;return;}
-    await loadHistory(userId);
-    note("Заявку скасовано.");
+    window.location.reload();
    };
    actions.append(cancel);
   }
