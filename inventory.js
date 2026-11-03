@@ -19,6 +19,7 @@ async function load(){
  $("#balances").classList.toggle("hide",role==="cleaner");
  $("#history").classList.toggle("hide",role==="cleaner");
  if(role!=="admin")$("#type").querySelectorAll("[data-admin]").forEach(el=>el.remove());
+ syncPurchaseFields();
  const {data:materials,error:ie}=await db.from("inventory_items").select("id,name,unit,unit_cost,reorder_level,active").eq("active",true).order("name");
  if(ie){msg("Помилка завантаження матеріалів: "+ie.message);return;}
  items=materials||[];
@@ -52,10 +53,14 @@ $("#movement").addEventListener("submit",async e=>{
  e.preventDefault();const button=e.currentTarget.querySelector("button");const type=$("#type").value,booking=$("#booking").value,quantity=Number($("#qty").value);
  if(!items.length||!Number.isFinite(quantity)||quantity<=0||type==="use"&&!booking){msg("Оберіть матеріал, замовлення і додатну кількість.");return;}
  button.disabled=true;
- const {error}=await db.from("inventory_movements").insert({item_id:$("#item").value,booking_id:booking||null,movement_type:type,quantity,note:$("#note").value.trim()||null,recorded_by:userId});
+ const unitPrice=Number($("#purchasePrice").value);
+ if(type==="purchase"&&(!$("#purchasePrice").value.trim()||!Number.isFinite(unitPrice)||unitPrice<0)){button.disabled=false;msg("Вкажіть закупівельну ціну за одиницю.");return;}
+ const payload={item_id:$("#item").value,booking_id:booking||null,movement_type:type,quantity,note:$("#note").value.trim()||null,recorded_by:userId};
+ if(type==="purchase"){payload.purchase_unit_price=unitPrice;payload.supplier=$("#supplier").value.trim()||null;payload.invoice_reference=$("#invoiceRef").value.trim()||null;}
+ const {error}=await db.from("inventory_movements").insert(payload);
  button.disabled=false;
  if(error){msg("Не вдалося зберегти: "+error.message);return;}
- $("#qty").value="";$("#note").value="";msg("Рух матеріалу збережено.");await refresh();
+ $("#qty").value="";$("#note").value="";$("#purchasePrice").value="";$("#supplier").value="";$("#invoiceRef").value="";msg("Рух матеріалу збережено.");await reloadMaterials();await refresh();
 });
 $("#newItem").addEventListener("submit",async e=>{
  e.preventDefault();if(role!=="admin")return;
@@ -65,6 +70,13 @@ $("#newItem").addEventListener("submit",async e=>{
  msg("Матеріал додано.");$("#newItem").reset();await reloadMaterials();await refresh();
 });
 
+function syncPurchaseFields(){
+ const isPurchase=$("#type").value==="purchase";
+ $("#purchaseFields").classList.toggle("hide",!isPurchase);
+ $("#purchasePrice").required=isPurchase;
+ $("#booking").required=$("#type").value==="use"||$("#type").value==="return";
+}
+$("#type").addEventListener("change",syncPurchaseFields);
 function showItemPrice(){
  const item=items.find(x=>x.id===$("#priceItem").value);
  if(!item)return;
