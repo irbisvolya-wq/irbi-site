@@ -6,6 +6,23 @@ body{background:#f4f7f5;color:#123a32}.wrap{max-width:1150px;margin:28px auto;pa
 <section class="grid" aria-label="Підсумки">
 <div class="metric"><strong id="revenue">—</strong><span>Сума замовлень, ₴</span></div><div class="metric"><strong id="paid">—</strong><span>Отримані оплати, ₴</span></div><div class="metric"><strong id="costs">—</strong><span>Враховані прямі витрати, ₴</span></div><div class="metric"><strong id="contribution">—</strong><span>Плановий маржинальний результат, ₴</span></div>
 </section>
+<section class="card"><h2>Звіт за місяць</h2>
+<label>Місяць <input id="month" type="month"></label>
+<div class="grid" aria-label="Місячні підсумки">
+<div class="metric"><strong id="monthJobs">—</strong><span>Виконано прибирань</span></div>
+<div class="metric"><strong id="monthSales">—</strong><span>Вартість завершених робіт, ₴</span></div>
+<div class="metric"><strong id="monthCash">—</strong><span>Отримано оплат у місяці, ₴</span></div>
+<div class="metric"><strong id="monthDirect">—</strong><span>Прямі витрати, ₴</span></div>
+<div class="metric"><strong id="monthFixed">—</strong><span>Постійні витрати, ₴</span></div>
+<div class="metric"><strong id="monthResult">—</strong><span>Розрахунковий операційний результат, ₴</span></div></div>
+<p id="monthWarning" class="muted"></p>
+<p class="muted">Вартість робіт віднесена до місяця завершення; фактичні надходження — до місяця оплати. Операційний результат не є залишком грошей на рахунку. Податки відображаються лише після внесення витрат.</p></section>
+<section class="card"><h2>Постійні витрати бізнесу</h2><form id="operatingForm"><div class="grid">
+<label>Дата витрати<input id="operatingDate" type="date" required></label>
+<label>Категорія<select id="operatingCategory"><option value="rent">Оренда</option><option value="marketing">Реклама</option><option value="software">Програмні сервіси</option><option value="communications">Зв'язок</option><option value="administration">Адміністративні</option><option value="tax">Податки</option><option value="other">Інше</option></select></label>
+<label>Сума, ₴<input id="operatingAmount" type="number" min="0.01" step="0.01" required></label>
+<label>Призначення<input id="operatingDescription" minlength="3" maxlength="300" required></label></div>
+<button class="btn btn-primary" type="submit">Записати витрату</button></form></section>
 <section class="card"><h2>Додати прямі витрати</h2><p class="muted">Зарплата клінера береться з погоджених нарахувань. Хімія — з журналу матеріалів. Тут вносяться транспорт, обладнання та інші прямі витрати.</p>
 <form id="expenseForm"><div class="grid"><label>Замовлення<select id="booking" required></select></label><label>Категорія<select id="category"><option value="transport">Транспорт</option><option value="equipment">Використання обладнання</option><option value="other">Інші прямі витрати</option></select></label><label>Сума, ₴<input id="amount" type="number" min="0.01" step="0.01" required></label><label>Пояснення<input id="description" minlength="3" maxlength="300" required></label></div><button class="btn btn-primary" type="submit">Додати витрату</button></form></section>
 <section class="card"><h2>Замовлення та маржинальність</h2><p class="muted">Показано до 200 останніх замовлень за датою. Розрахунок без постійних витрат і податків; незавершені замовлення не є остаточними фінансовими результатами.</p><div style="overflow:auto"><table><thead><tr><th>Замовлення</th><th>Дата</th><th>Стан</th><th>Ціна</th><th>Оплата</th><th>Матеріали</th><th>Зарплата</th><th>Інші</th><th>Результат</th><th>Маржа</th></tr></thead><tbody id="rows"></tbody></table></div></section>
