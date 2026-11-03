@@ -13,7 +13,7 @@ async function load(){
  if(pe||profile?.role!=="admin"){msg("Цей розділ доступний лише адміністратору.");return;}
  $("#content").classList.remove("hide");
  const [u,b,e]=await Promise.all([
-  db.from("profiles").select("id,full_name,role").order("created_at",{ascending:false}),
+  db.rpc("irbi_admin_accounts"),
   db.from("bookings").select("id,assigned_cleaner_id,scheduled_at,status").not("assigned_cleaner_id","is",null).order("scheduled_at",{ascending:false}).limit(200),
   db.from("cleaner_earnings").select("booking_id,cleaner_id,entry_type,amount,status").order("created_at",{ascending:false}).limit(100)
  ]);
@@ -21,7 +21,7 @@ async function load(){
  users=u.data||[];orders=b.data||[];
  $("#people").replaceChildren();
  for(const p of users){
- const tr=document.createElement("tr");td(tr,p.full_name||p.id.slice(0,8));td(tr,p.role);
+ const tr=document.createElement("tr");td(tr,(p.full_name||"Без імені")+" · "+p.email);td(tr,p.role);
  const choice=document.createElement("select");
  for(const [v,t] of [["customer","Клієнт"],["cleaner","Клінер"],["dispatcher","Координатор"]])choice.append(opt(v,t));
  choice.value=p.role==="admin"?"customer":p.role;
