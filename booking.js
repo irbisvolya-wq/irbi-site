@@ -38,7 +38,7 @@ async function init(){
  if(pe||profile?.role!=="customer"){message("Запити на прибирання оформлюються з клієнтського кабінету.");return;}
  $("#phone").value=profile?.phone||"";
  $("#content").classList.remove("hide");message("Заповніть дані для запиту.");
- const tomorrow=new Date(Date.now()+48*3600*1000);const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000);
+ const tomorrow=new Date(Date.now()+12*3600*1000+60000);const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000);
  $("#scheduled").min=local.toISOString().slice(0,16);quote();
 }
 init().catch(e=>message(e.message));
