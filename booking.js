@@ -39,7 +39,7 @@ async function init(){
  $("#phone").value=profile?.phone||"";
  const repeatId=new URLSearchParams(location.search).get("repeat");
  if(repeatId){
-  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(repeatId)){message("Некоректний номер повторюваної заявки.");return;}
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repeatId)){message("Некоректний номер повторюваної заявки.");return;}
   const {data:previous,error:repeatError}=await db.from("bookings")
    .select("service_type,rooms,property_type,bathrooms,area_m2,address,apartment,entrance,floor,access_notes,contact_phone,frequency,cleaning_features")
    .eq("id",repeatId).eq("customer_id",user.id).maybeSingle();
