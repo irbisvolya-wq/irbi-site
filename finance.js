@@ -3,6 +3,10 @@ const db=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publishable
 const $=selector=>document.querySelector(selector);
 const money=v=>new Intl.NumberFormat("uk-UA",{maximumFractionDigits:2}).format(Number(v||0));
 let currentUser=null;
+const today=new Date();
+const isoLocalDate=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+$("#month").value=isoLocalDate(today).slice(0,7);
+$("#operatingDate").value=isoLocalDate(today);
 function message(text){$("#message").textContent=text;}
 function cell(tr,value){const td=document.createElement("td");td.textContent=String(value);tr.append(td);}
 async function render(){
@@ -29,8 +33,42 @@ async function render(){
  $("#revenue").textContent=money(revenue);$("#paid").textContent=money(paid);
  $("#costs").textContent=money(costs);$("#contribution").textContent=money(contrib);
  message(orders.length?"Фінансовий звіт завантажено. Підсумки охоплюють лише показані замовлення.":"Замовлень поки немає.");
+ await renderMonthly();
  $("#expenseForm").querySelector("button").disabled=!orders.length;
 }
+async function renderMonthly(){
+ const period=$("#month").value;
+ if(!/^\\d{4}-\\d{2}$/.test(period))return;
+ const {data,error}=await db.from("irbi_monthly_finance").select("*").eq("month_start",period+"-01").maybeSingle();
+ if(error){message("Місячний звіт недоступний: "+error.message);return;}
+ const d=data||{};
+ $("#monthJobs").textContent=Number(d.jobs_completed||0);
+ $("#monthSales").textContent=money(d.sales_value);
+ $("#monthCash").textContent=money(d.cash_received);
+ const direct=Number(d.material_cost||0)+Number(d.labor_cost||0)+Number(d.direct_other_cost||0);
+ $("#monthDirect").textContent=money(direct);
+ $("#monthFixed").textContent=money(d.operating_cost);
+ $("#monthResult").textContent=money(d.operating_result);
+ $("#monthWarning").textContent=Number(d.incomplete_labor_jobs||0)>0
+ ?"Увага: "+d.incomplete_labor_jobs+" завершених замовлень мають незавершені нарахування. Результат попередній."
+ :"Підсумок не враховує невнесені витрати та платежі.";
+}
+$("#month").addEventListener("change",()=>renderMonthly().catch(e=>message(e.message)));
+$("#operatingForm").addEventListener("submit",async e=>{
+ e.preventDefault();if(!currentUser)return;
+ const btn=e.currentTarget.querySelector("button");
+ const amount=Number($("#operatingAmount").value),description=$("#operatingDescription").value.trim();
+ if(!Number.isFinite(amount)||amount<=0||description.length<3){message("Перевірте суму й опис витрати.");return;}
+ btn.disabled=true;
+ const {error}=await db.from("operating_expenses").insert({
+ expense_date:$("#operatingDate").value,category:$("#operatingCategory").value,
+ amount,description,recorded_by:currentUser.id
+ });
+ btn.disabled=false;
+ if(error){message("Не вдалося записати витрату: "+error.message);return;}
+ $("#operatingAmount").value="";$("#operatingDescription").value="";
+ await renderMonthly();message("Постійну витрату записано.");
+});
 $("#expenseForm").addEventListener("submit",async e=>{
  e.preventDefault();
  if(!currentUser)return;
