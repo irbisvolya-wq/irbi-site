@@ -1,0 +1,14 @@
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IRBI — Персонал і виплати</title><link rel="stylesheet" href="/styles.css"><style>
+body{background:#f4f7f5;color:#123a32}.wrap{max-width:1050px;margin:auto;padding:22px}.card{background:white;border-radius:16px;padding:22px;margin:16px 0;box-shadow:0 4px 14px #173d2911}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:15px}label{display:block;font-weight:600}input,select{display:block;width:100%;padding:11px;margin-top:7px;border:1px solid #b9c9c0;border-radius:8px}.hide{display:none!important}table{width:100%;min-width:640px;border-collapse:collapse}td,th{text-align:left;padding:11px;border-bottom:1px solid #e3ece7}button{margin:10px 5px 0 0}p{line-height:1.5}.muted{color:#64776b}</style></head>
+<body><main class="wrap"><p><a href="/portal.html">← Кабінет IRBI</a></p><h1>Персонал і нарахування</h1><p id="message" role="status" aria-live="polite">Перевіряємо права доступу…</p>
+<div id="content" class="hide"><section class="card"><h2>Ролі працівників</h2><p class="muted">Самостійна реєстрація дає лише роль клієнта. Права клінеру або координатору надає адміністратор. Призначення нового адміністратора виконується окремо власником системи.</p>
+<div style="overflow:auto"><table><thead><tr><th>Користувач</th><th>Поточна роль</th><th>Нова роль</th><th>Дія</th></tr></thead><tbody id="people"></tbody></table></div></section>
+<section class="card"><h2>Нарахування за виконані роботи</h2><form id="payrollForm">
+<div class="grid"><label>Замовлення<select id="booking" required></select></label>
+<label>Тип виплати<select id="type"><option value="cleaning">За прибирання</option><option value="travel">Проїзд</option><option value="mentoring">Наставництво</option><option value="coordination">Координація</option><option value="adjustment">Коригування</option></select></label>
+<label>Сума, ₴<input id="amount" type="number" min="0" step="0.01" required></label>
+<label>Коментар<input id="note" maxlength="300"></label></div>
+<div><button type="button" class="btn btn-secondary" data-action="draft">Чернетка</button><button type="button" class="btn btn-primary" data-action="approve">Затвердити</button><button type="button" class="btn btn-secondary" data-action="paid">Позначити виплаченим</button></div></form>
+<p class="muted">Виплата позначається лише після фактичного переказу коштів. Сума повинна бути попередньо затверджена.</p>
+</section><section class="card"><h2>Реєстр нарахувань</h2><div style="overflow:auto"><table><thead><tr><th>Замовлення</th><th>Клінер</th><th>Тип</th><th>Сума</th><th>Статус</th></tr></thead><tbody id="earnings"></tbody></table></div></section></div>
+<script type="module" src="/staff.js"></script></main></body></html>
