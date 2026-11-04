@@ -81,11 +81,14 @@ async function loadHistory(userId){
   const form=document.createElement("form"),input=document.createElement("textarea"),send=document.createElement("button");
   input.rows=3;input.maxLength=2000;input.required=true;input.placeholder="Ваше запитання команді IRBI";input.style.cssText="width:100%;max-width:100%;padding:10px";
   send.type="submit";send.className="btn btn-primary";send.textContent="Надіслати повідомлення";form.append(input,send);
+  let chatRefreshVersion=0;
   async function refreshChat(){
-   const {data,error}=await db.from("irbi_booking_messages").select("sender_id,audience,body,created_at").eq("booking_id",b.id).order("created_at",{ascending:true}).limit(100);
+   const version=++chatRefreshVersion;
+   const {data,error}=await db.from("irbi_booking_messages").select("sender_id,audience,body,created_at").eq("booking_id",b.id).order("created_at",{ascending:false}).limit(100);
+   if(version!==chatRefreshVersion)return;
    if(error){chatStatus.textContent=error.message;return;}
    history.replaceChildren();chatStatus.textContent=data?.length?"":"Повідомлень ще немає.";
-   for(const m of data||[]){const p=document.createElement("p");p.style.cssText="padding:9px;border-radius:8px;background:#eaf4ed;margin:8px 0";p.textContent=(m.audience==="staff"?"Ви":"Команда IRBI")+" · "+date(m.created_at)+" — "+m.body;history.append(p);}
+   for(const m of (data||[]).reverse()){const p=document.createElement("p");p.style.cssText="padding:9px;border-radius:8px;background:#eaf4ed;margin:8px 0";p.textContent=(m.audience==="staff"?"Ви":"Команда IRBI")+" · "+date(m.created_at)+" — "+m.body;history.append(p);}
   }
   details.addEventListener("toggle",()=>{if(details.open)refreshChat();});
   form.addEventListener("submit",async e=>{
