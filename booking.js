@@ -6,6 +6,7 @@ const money=x=>new Intl.NumberFormat("uk-UA").format(x)+" ₴";
 const message=x=>$("#message").textContent=x;
 const addonsList=["balcony","fridge","oven","cabinets"];
 const requestParams=new URLSearchParams(location.search);
+let submitting=false;
 
 function applyCalculatorSelection(){
  const service=requestParams.get("service"),rooms=requestParams.get("rooms");
@@ -21,16 +22,18 @@ function quote(){
  const addons=addonsList.reduce((acc,key)=>({...acc,[key]:$("#"+key).checked}),{});
  const price=base+(addons.balcony&&service!=="move"?300:0)+(addons.fridge?250:0)+(addons.oven?300:0)+(addons.cabinets?300:0);
  $("#quote").textContent=money(price);$("#quoteNote").textContent="Орієнтовно. Підтвердження потрібне перед виконанням.";
- $("#send").disabled=false;
+ $("#send").disabled=submitting;
 }
 ["service","rooms",...addonsList].forEach(s=>$("#"+s).addEventListener("change",quote));
 $("#requestForm").addEventListener("submit",async event=>{
  event.preventDefault();
- if(!$("#agreement").checked)return;
+ if(submitting||$("#send").disabled||!$("#agreement").checked)return;
  const dt=new Date($("#scheduled").value);
  if(!Number.isFinite(dt.getTime())){message("Оберіть коректну дату.");return;}
  if(dt.getTime()<Date.now()+12*3600*1000){message("Оберіть дату щонайменше за 12 годин.");return;}
- const btn=$("#send");btn.disabled=true;message("Зберігаємо ваш запит…");
+ submitting=true;
+ $("#send").disabled=true;
+ message("Зберігаємо ваш запит…");
  const addons={};for(const key of addonsList)addons[key]=$("#"+key).checked;
  const args={p_service:$("#service").value,p_rooms:Number($("#rooms").value),p_scheduled_at:dt.toISOString(),p_address:$("#address").value.trim(),p_property_type:$("#propertyType").value,p_bathrooms:Number($("#bathrooms").value),p_area_m2:Number($("#area").value),p_phone:$("#phone").value.trim(),p_apartment:$("#apartment").value.trim(),p_entrance:$("#entrance").value.trim(),p_floor:$("#floor").value.trim(),p_access_notes:$("#notes").value.trim(),p_frequency:$("#frequency").value,p_addons:addons};
  try{
@@ -39,11 +42,25 @@ $("#requestForm").addEventListener("submit",async event=>{
   $("#content").classList.add("hide");$("#success").classList.remove("hide");
   $("#receipt").textContent="Номер запиту: "+String(data).slice(0,8);
   message("Запит збережено в IRBI.");
- }catch(err){message("Запит не збережено: "+(err.message||"Помилка з’єднання"));btn.disabled=false;}
+ }catch(err){
+  message("Запит не збережено: "+(err.message||"Помилка з’єднання"));
+  submitting=false;
+  quote();
+ }
 });
 async function init(){
  const {data:{user},error}=await db.auth.getUser();
- if(error||!user){message("Щоб залишити запит, увійдіть або зареєструйтеся в IRBI.");const a=document.createElement("a");a.href="/portal.html?"+new URLSearchParams({next:location.pathname+location.search});a.textContent="Увійти або зареєструватися";a.className="btn btn-primary";$("#message").after(a);return;}
+ if(error||!user){
+  const loginHref="/portal.html?"+new URLSearchParams({next:location.pathname+location.search});
+  $('main > p > a[href="/portal.html"]').href=loginHref;
+  message("Щоб залишити запит, увійдіть або зареєструйтеся в IRBI.");
+  const a=document.createElement("a");
+  a.href=loginHref;
+  a.textContent="Увійти або зареєструватися";
+  a.className="btn btn-primary";
+  $("#message").after(a);
+  return;
+ }
  const {data:profile,error:pe}=await db.from("profiles").select("role,phone").eq("id",user.id).maybeSingle();
  if(pe||profile?.role!=="customer"){message("Запити на прибирання оформлюються з клієнтського кабінету.");return;}
  $("#phone").value=profile?.phone||"";
