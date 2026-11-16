@@ -81,7 +81,7 @@
       <div class="container">
         <div class="section-head">
           <span>Послуги</span>
-          <h2>Під різні задачі, а не одна «універсальна» уборка</h2>
+          <h2>Види прибирання</h2>
           <p>Ми розділяємо послуги за обсягом робіт, щоб клієнт розумів, що входить у замовлення і за що платить.</p>
         </div>
         <div class="services-grid">
@@ -146,7 +146,7 @@
           <div class="section-head left">
             <span>Калькулятор</span>
             <h2>Орієнтовна вартість за 20 секунд</h2>
-            <p>Це робочий калькулятор на базі поточного прайсу IRBI. Він не створює реальне замовлення — сервіс ще готується до запуску.</p>
+            <p>Розрахуйте попередню вартість і за бажанням надішліть запит на прибирання.</p>
           </div>
           <form id="calculatorForm" class="calculator-form">
             <div class="form-grid">
@@ -192,7 +192,7 @@
             <div><span>Додатково</span><b id="summaryAddons">—</b></div>
           </div>
           <div class="summary-warning" id="summaryWarning">Фінальна ціна підтверджуватиметься до оформлення замовлення.</div>
-          <a class="btn btn-secondary btn-lg full" style="margin-bottom:10px" href="/booking.html">Запит на прибирання (очікує підтвердження)</a><button class="btn btn-primary btn-lg full" type="button" id="openInterest">Дізнатися про запуск</button>
+          <a class="btn btn-secondary btn-lg full" style="margin-bottom:10px" href="/booking.html">Надіслати запит на прибирання</a><button class="btn btn-primary btn-lg full" type="button" id="openInterest">Дізнатися про запуск</button>
         </aside>
       </div>
     </section>
@@ -240,7 +240,7 @@
         <div class="faq">
           <details open>
             <summary>IRBI вже приймає замовлення?</summary>
-            <p>Ще ні. Сайт зараз показує майбутню модель сервісу, робочий прайс і логіку замовлення. Повноцінний запуск буде окремо оголошений.</p>
+            <p>Можна надіслати попередній запит. Дату й остаточну ціну узгоджує команда IRBI. Онлайн-бронювання відкриємо після запуску.</p>
           </details>
           <details>
             <summary>Ціни вже остаточні?</summary>
@@ -263,7 +263,7 @@
         <div>
           <span class="eyebrow">IRBI · prelaunch</span>
           <h2>Хочете дізнатися, коли ми відкриємо замовлення?</h2>
-          <p>Залиште контакт, щоб отримати повідомлення про відкриття IRBI. Це ще не оформлення замовлення.</p>
+          <p>Залиште телефон або email, щоб отримати повідомлення про відкриття IRBI.</p>
         </div>
         <button class="btn btn-primary btn-lg" id="openInterestBottom">Залишити контакт</button>
       </div>
@@ -291,17 +291,20 @@
   </footer>
 
   <div class="modal" id="interestModal" aria-hidden="true">
-    <div class="modal-card">
+    <div class="modal-card" role="dialog" aria-labelledby="interestTitle">
       <button class="modal-close" type="button" data-close aria-label="Закрити">×</button>
-      <span class="eyebrow">Ранній доступ</span>
-      <h3>Повідомити про запуск IRBI</h3>
-      <p>Залиште контакт для раннього доступу. Замовлення поки не приймаються.</p>
+      <h3 id="interestTitle">Повідомлення про запуск IRBI</h3>
+      <p>Залиште контакт, і ми повідомимо, коли відкриємо онлайн-бронювання.</p>
       <form id="interestForm" class="interest-form">
-        <label class="field"><span>Ім’я</span><input id="interestName" type="text" required placeholder="Ваше ім’я"></label>
+        <label class="field"><span>Ім’я</span><input id="interestName" type="text" autocomplete="name" required placeholder="Ваше ім’я"></label>
         <label class="field"><span>Телефон або email</span><input id="interestContact" type="text" required placeholder="+380… або email"></label>
-        <div style="position:absolute;left:-9999px" aria-hidden="true"><label>Сайт<input id="interestWebsite" type="text" tabindex="-1" autocomplete="off"></label></div>\n        <label class="check"><input id="privacyAccepted" type="checkbox" required><span>Погоджуюсь на обробку контактних даних для відповіді на заявку.</span></label>\n        <label class="check"><input id="marketingConsent" type="checkbox"><span>Хочу отримати повідомлення про запуск та пропозиції IRBI (необов’язково).</span></label>\n        <p id="interestStatus" role="status" aria-live="polite"></p>\n        <button class="btn btn-primary full" type="submit">Надіслати заявку</button>
+        <div style="position:absolute;left:-9999px" aria-hidden="true"><label>Сайт<input id="interestWebsite" type="text" tabindex="-1" autocomplete="off"></label></div>
+        <label class="check"><input id="privacyAccepted" type="checkbox" required><span>Погоджуюсь на обробку контактних даних, щоб отримати повідомлення про запуск.</span></label>
+        <label class="check"><input id="marketingConsent" type="checkbox"><span>Хочу також отримувати пропозиції IRBI (необов’язково).</span></label>
+        <p id="interestStatus" role="status" aria-live="polite"></p>
+        <button class="btn btn-primary full" type="submit">Залишити контакт</button>
       </form>
-      <div class="success-box" id="interestSuccess" hidden>Дякуємо! Заявку отримано. Це не бронювання прибирання.</div>
+      <div class="success-box" id="interestSuccess" hidden>Дякуємо! Контакт збережено. Повідомимо про запуск IRBI.</div>
     </div>
   </div>
 
