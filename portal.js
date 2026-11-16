@@ -3,6 +3,15 @@ const supabase=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publi
 const $=s=>document.querySelector(s);
 let mode="login";
 let recovering=false;
+const nextRequest=new URLSearchParams(location.search).get("next");
+if(nextRequest?.startsWith("/booking.html?")){
+ const requestUrl=new URL(nextRequest,location.origin);
+ const requestLink=$("#customerRequestNav a");
+ if(requestUrl.origin===location.origin&&requestUrl.pathname==="/booking.html"&&requestLink){
+  requestLink.href=requestUrl.pathname+requestUrl.search;
+  requestLink.textContent="Продовжити запит";
+ }
+}
 function toggleMode(register){
  mode=register?"register":"login";
  $("#authTitle").textContent=register?"Створити акаунт IRBI":"Увійти в IRBI";

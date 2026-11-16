@@ -26,6 +26,7 @@ function calculate() {
   let base = service.prices[roomCount];
   let total = base || 0;
   const selected = [];
+  const bookingParams = new URLSearchParams({ service: serviceType.value, rooms: String(roomCount) });
 
   const moveInOut = serviceType.value === "move";
   $$("[data-addon]").forEach((checkbox) => {
@@ -47,10 +48,13 @@ function calculate() {
     }
 
     if (checkbox.checked) {
+      bookingParams.set(checkbox.dataset.addon, "1");
       total += Number(checkbox.dataset.price || 0);
       selected.push(checkbox.nextElementSibling?.textContent?.trim() || "Додаткова робота");
     }
   });
+
+  $('a[href^="/booking.html"]').href = "/booking.html?" + bookingParams.toString();
 
   summaryService.textContent = service.name;
   summaryRooms.textContent = roomCount;
