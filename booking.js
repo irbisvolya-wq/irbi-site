@@ -7,6 +7,36 @@ const message=x=>$("#message").textContent=x;
 const addonsList=["balcony","fridge","oven","cabinets"];
 const requestParams=new URLSearchParams(location.search);
 let submitting=false;
+let activeDraftKey;
+
+const draftFields=["service","rooms","propertyType","bathrooms","area","frequency"];
+const draftLifetime=30*60*1000;
+function draftKey(userId){
+ return "irbi.booking.draft:"+userId+":"+requestParams.toString();
+}
+function restoreDraft(key){
+ try{
+  const draft=JSON.parse(sessionStorage.getItem(key));
+  if(!draft)return false;
+  if(Date.now()-draft.updatedAt>draftLifetime){
+   sessionStorage.removeItem(key);
+   return false;
+  }
+  for(const field of draftFields)$("#"+field).value=draft.fields[field];
+  for(const addon of addonsList)$("#"+addon).checked=draft.addons[addon]===true;
+  return true;
+ }catch{return false;}
+}
+function saveDraft(key){
+ try{
+  const fields=Object.fromEntries(draftFields.map(field=>[field,$("#"+field).value]));
+  const addons=Object.fromEntries(addonsList.map(addon=>[addon,$("#"+addon).checked]));
+  sessionStorage.setItem(key,JSON.stringify({updatedAt:Date.now(),fields,addons}));
+ }catch{}
+}
+function clearDraft(key){
+ try{sessionStorage.removeItem(key);}catch{}
+}
 
 function applyCalculatorSelection(){
  const service=requestParams.get("service"),rooms=requestParams.get("rooms");
@@ -25,6 +55,9 @@ function quote(){
  $("#send").disabled=submitting;
 }
 ["service","rooms",...addonsList].forEach(s=>$("#"+s).addEventListener("change",quote));
+$("#requestForm").addEventListener("input",event=>{
+ if(activeDraftKey&&[...draftFields,...addonsList].includes(event.target.id))saveDraft(activeDraftKey);
+});
 $("#requestForm").addEventListener("submit",async event=>{
  event.preventDefault();
  if(submitting||$("#send").disabled||!$("#agreement").checked)return;
@@ -39,6 +72,8 @@ $("#requestForm").addEventListener("submit",async event=>{
  try{
   const {data,error}=await db.rpc("irbi_customer_request",args);
   if(error)throw error;
+  clearDraft(activeDraftKey);
+  activeDraftKey=null;
   $("#content").classList.add("hide");$("#success").classList.remove("hide");
   $("#receipt").textContent="Номер запиту: "+String(data).slice(0,8);
   message("Запит збережено в IRBI.");
@@ -80,6 +115,8 @@ async function init(){
    requestMessage="Дані попередньої заявки перенесено. Оберіть нові дату й час.";
   }
  }
+ activeDraftKey=draftKey(user.id);
+ if(restoreDraft(activeDraftKey))requestMessage="Відновлено параметри прибирання. Перевірте адресу й оберіть дату та час.";
  $("#content").classList.remove("hide");message(requestMessage);
  const tomorrow=new Date(Date.now()+12*3600*1000+60000);const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000);
  $("#scheduled").min=local.toISOString().slice(0,16);quote();
