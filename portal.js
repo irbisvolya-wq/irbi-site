@@ -3,12 +3,14 @@ const supabase=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publi
 const $=s=>document.querySelector(s);
 let mode="login";
 let recovering=false;
+const authReturnUrl=new URL("/portal.html",location.origin);
 const nextRequest=new URLSearchParams(location.search).get("next");
 if(nextRequest?.startsWith("/booking.html?")){
  const requestUrl=new URL(nextRequest,location.origin);
  const requestLink=$("#customerRequestNav a");
  if(requestUrl.origin===location.origin&&requestUrl.pathname==="/booking.html"&&requestLink){
   requestLink.href=requestUrl.pathname+requestUrl.search;
+  authReturnUrl.searchParams.set("next",requestLink.getAttribute("href"));
   requestLink.textContent="Продовжити запит";
  }
 }
@@ -24,6 +26,37 @@ function toggleMode(register){
 }
 $("#showLogin").onclick=()=>toggleMode(false);
 $("#showRegister").onclick=()=>toggleMode(true);
+function emailForAuth(){
+ const email=$("#email");
+ if(email.value.trim()&&email.checkValidity())return email.value.trim();
+ $("#authMessage").textContent="Введіть коректну електронну адресу.";
+ email.focus();
+ return null;
+}
+function authError(error){
+ switch(error.code){
+  case "email_not_confirmed":return "Підтвердьте електронну адресу. Якщо листа немає, надішліть його повторно.";
+  case "invalid_credentials":return "Перевірте електронну адресу й пароль. Якщо ви ще не маєте акаунта, зареєструйтеся.";
+  case "over_email_send_rate_limit":
+  case "over_request_rate_limit":return "Забагато спроб. Зачекайте трохи й повторіть.";
+  case "email_address_not_authorized":return "Зараз ми не можемо надіслати лист на цю адресу. Зверніться до підтримки IRBI.";
+  case "weak_password":return "Оберіть надійніший пароль.";
+  default:return "Не вдалося виконати дію. Спробуйте ще раз або зверніться до підтримки IRBI.";
+ }
+}
+$("#resendConfirmation").onclick=async()=>{
+ const email=emailForAuth();
+ if(!email)return;
+ const button=$("#resendConfirmation");
+ button.disabled=true;
+ $("#authMessage").textContent="Зачекайте, обробляємо запит…";
+ try{
+  const {error}=await supabase.auth.resend({type:"signup",email,options:{emailRedirectTo:authReturnUrl.href}});
+  if(error)throw error;
+  $("#authMessage").textContent="Якщо адреса очікує підтвердження, надішлемо лист. Перевірте вхідні та спам.";
+ }catch(error){$("#authMessage").textContent=authError(error);}
+ finally{button.disabled=false;}
+};
 $("#forgotPassword").onclick=async()=>{
  const email=$("#email").value.trim();
  if(!email||!$("#email").checkValidity()){
@@ -34,7 +67,7 @@ $("#forgotPassword").onclick=async()=>{
   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin+"/portal.html"});
   if(error)throw error;
   $("#authMessage").textContent="Якщо адреса зареєстрована, надішлемо лист для відновлення пароля.";
- }catch(err){$("#authMessage").textContent=err.message||"Не вдалося надіслати лист.";}
+ }catch(err){$("#authMessage").textContent=authError(err);}
  finally{$("#forgotPassword").disabled=false;}
 };
 $("#authForm").onsubmit=async e=>{
@@ -44,10 +77,14 @@ $("#authForm").onsubmit=async e=>{
  try{
   if(mode==="register"){
    const full_name=$("#fullName").value.trim();
-   if(full_name.length<2)throw new Error("Вкажіть ім’я (щонайменше 2 символи).");
+   if(full_name.length<2){
+    $("#authMessage").textContent="Вкажіть ім’я (щонайменше 2 символи).";
+    $("#fullName").focus();
+    return;
+   }
    const {data,error}=await supabase.auth.signUp({
     email,password,
-    options:{data:{full_name,phone:$("#phone").value.trim()||null},emailRedirectTo:location.origin+"/portal.html"}
+    options:{data:{full_name,phone:$("#phone").value.trim()||null},emailRedirectTo:authReturnUrl.href}
    });
    if(error)throw error;
    $("#authMessage").textContent=data.session?"Реєстрацію завершено.":"Перевірте пошту й підтвердьте адресу для входу.";
@@ -56,7 +93,7 @@ $("#authForm").onsubmit=async e=>{
    if(error)throw error;
    $("#authMessage").textContent="Вхід виконано.";
   }
- }catch(err){$("#authMessage").textContent=err.message||"Помилка авторизації";}
+ }catch(err){$("#authMessage").textContent=authError(err);}
  finally{btn.disabled=false;}
 };
 $("#logout").onclick=async()=>{const {error}=await supabase.auth.signOut();if(error){$("#roleNotice").textContent=error.message;return;}location.replace("/portal.html");};
