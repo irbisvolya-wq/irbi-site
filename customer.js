@@ -4,7 +4,9 @@ const $=s=>document.querySelector(s);
 const labels={pending:"Очікує підтвердження",confirmed:"Підтверджено",assigned:"Призначено клінера",accepted:"Клінер прийняв",en_route:"Клінер у дорозі",arrived:"Клінер на місці",in_progress:"Виконується",completed:"Завершено",cancelled:"Скасовано"};
 const services={regular:"Підтримувальне",general:"Генеральне",move:"Заселення / виселення",repair:"Після ремонту"};
 const date=v=>v?new Date(v).toLocaleString("uk-UA",{dateStyle:"medium",timeStyle:"short"}):"—";
-const money=v=>new Intl.NumberFormat("uk-UA",{maximumFractionDigits:2}).format(Number(v||0))+" ₴";
+const money=v=>v===null||v===undefined||v===""?"Не вказано":new Intl.NumberFormat("uk-UA",{maximumFractionDigits:2}).format(Number(v))+" ₴";
+const frequencies={once:"Один раз",weekly:"Щотижня",biweekly:"Раз на 2 тижні",monthly:"Щомісяця"};
+const agreedStatuses=new Set(["confirmed","assigned","accepted","en_route","arrived","in_progress","completed"]);
 const note=(text)=>{$("#customerHistoryMessage").textContent=text;};
 const field=(parent,label,value)=>{
  const p=document.createElement("p");
@@ -32,7 +34,7 @@ function hide(){
 async function loadHistory(userId){
  note("Завантаження заявок…");
  const {data,error}=await db.from("bookings")
- .select("id,service_type,status,scheduled_at,rooms,bathrooms,area_m2,property_type,address,apartment,entrance,floor,access_notes,contact_phone,total,frequency,cleaning_features,created_at,cancellation_reason")
+ .select("id,service_type,status,scheduled_at,rooms,bathrooms,area_m2,property_type,address,apartment,entrance,floor,access_notes,contact_phone,total,frequency,cleaning_features,created_at,cancellation_reason,duration_minutes,scheduled_end_at")
  .eq("customer_id",userId).order("created_at",{ascending:false}).limit(100);
  if(error){note("Не вдалося завантажити історію: "+error.message);return;}
  const root=$("#customerHistory");root.replaceChildren();
@@ -48,13 +50,18 @@ async function loadHistory(userId){
   field(body,"Номер",b.id.slice(0,8));
   field(body,"Статус",labels[b.status]||b.status);
   field(body,"Дата заявки",date(b.created_at));
-  field(body,"Бажаний час",date(b.scheduled_at));
+  const agreed=agreedStatuses.has(b.status);
+  field(body,agreed?"Погоджений початок":"Бажаний час",date(b.scheduled_at));
+  field(body,agreed?"Погоджена вартість":"Попередня вартість",money(b.total));
+  if(b.duration_minutes)field(body,"Планова тривалість",b.duration_minutes+" хв");
+  if(agreed&&b.scheduled_end_at)field(body,"Планове завершення",date(b.scheduled_end_at));
+  if(b.status==="pending"){const reminder=document.createElement("p");reminder.textContent="Час і остаточна вартість ще потребують підтвердження IRBI.";body.append(reminder);}
   field(body,"Адреса",[b.address,b.apartment?"кв. "+b.apartment:"",b.entrance?"під’їзд "+b.entrance:"",b.floor?"поверх "+b.floor:""].filter(Boolean).join(", "));
   field(body,"Телефон",b.contact_phone);
   field(body,"Кімнати / санвузли",(b.rooms??"—")+" / "+(b.bathrooms??"—"));
   field(body,"Площа",b.area_m2?b.area_m2+" м²":"—");
   field(body,"Примітки",b.access_notes||"—");
-  field(body,"Періодичність",b.frequency==="once"?"Один раз":b.frequency||"—");
+  field(body,"Періодичність",frequencies[b.frequency]||b.frequency||"—");
   const addons=b.cleaning_features?.requested_addons||{};
   const addonLabels={balcony:"Балкон",fridge:"Холодильник",oven:"Духовка",cabinets:"Шафи"};
   const chosen=Object.entries(addons).filter(([key,value])=>value===true&&addonLabels[key]).map(([key])=>addonLabels[key]);
@@ -65,11 +72,14 @@ async function loadHistory(userId){
   if(b.status==="pending"){
    const cancel=document.createElement("button");cancel.type="button";cancel.className="btn btn-secondary";cancel.textContent="Скасувати запит";
    cancel.onclick=async()=>{
-    if(!confirm("Скасувати заявку "+b.id.slice(0,8)+"?"))return;
+    if(cancel.disabled||!confirm("Скасувати заявку "+b.id.slice(0,8)+"?"))return;
     cancel.disabled=true;note("Скасовуємо заявку…");
-    const {error}=await db.rpc("irbi_customer_cancel_request",{p_booking:b.id});
-    if(error){note("Скасування не виконано: "+error.message);cancel.disabled=false;return;}
-    window.location.reload();
+    try{
+     const {error}=await db.rpc("irbi_customer_cancel_request",{p_booking:b.id});
+     if(error)throw error;
+     window.location.reload();
+    }catch{note("Не вдалося скасувати запит. Перевірте актуальний статус заявки та з’єднання.");}
+    finally{cancel.disabled=false;}
    };
    actions.append(cancel);
   }
@@ -92,11 +102,15 @@ async function loadHistory(userId){
   }
   details.addEventListener("toggle",()=>{if(details.open)refreshChat();});
   form.addEventListener("submit",async e=>{
-   e.preventDefault();if(!input.value.trim())return;send.disabled=true;
-   const {error}=await db.rpc("irbi_send_booking_message",{p_booking:b.id,p_body:input.value.trim()});
-   send.disabled=false;
-   if(error){chatStatus.textContent="Помилка: "+error.message;return;}
-   input.value="";await refreshChat();
+   e.preventDefault();if(send.disabled||!input.value.trim())return;
+   send.disabled=true;input.disabled=true;chatStatus.textContent="Надсилаємо…";
+   try{
+    const {error}=await db.rpc("irbi_send_booking_message",{p_booking:b.id,p_body:input.value.trim()});
+    if(error)throw error;
+    input.value="";
+    try{await refreshChat();}catch{chatStatus.textContent="Повідомлення надіслано. Оновіть заявку, щоб завантажити переписку.";}
+   }catch{chatStatus.textContent="Не вдалося надіслати повідомлення. Текст збережено у полі — повторіть спробу.";}
+   finally{send.disabled=false;input.disabled=false;}
   });
   chat.append(form);body.append(chat);
   details.append(body);article.append(details);root.append(article);
@@ -106,10 +120,14 @@ $("#customerProfileForm").addEventListener("submit",async e=>{
  e.preventDefault();if(!signedIn)return;
  const name=$("#customerProfileName").value.trim(),phone=$("#customerProfilePhone").value.trim();
  const button=e.currentTarget.querySelector('button[type="submit"]');
- button.disabled=true;
- const {error}=await db.rpc("irbi_customer_update_profile",{p_name:name,p_phone:phone});
- button.disabled=false;
- $("#customerProfileMessage").textContent=error?"Не вдалося зберегти: "+error.message:"Контактні дані оновлено.";
+ if(button.disabled)return;
+ button.disabled=true;$("#customerProfileMessage").textContent="Зберігаємо…";
+ try{
+  const {error}=await db.rpc("irbi_customer_update_profile",{p_name:name,p_phone:phone});
+  if(error)throw error;
+  $("#customerProfileMessage").textContent="Контактні дані оновлено.";
+ }catch{$("#customerProfileMessage").textContent="Не вдалося зберегти контакти. Перевірте з’єднання та повторіть спробу.";}
+ finally{button.disabled=false;}
 });
 db.auth.onAuthStateChange(()=>setTimeout(()=>loadCustomer().catch(e=>note(e.message)),0));
 loadCustomer().catch(e=>note(e.message));
