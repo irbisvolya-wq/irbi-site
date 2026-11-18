@@ -18,11 +18,18 @@ function restoreDraft(key){
  try{
   const draft=JSON.parse(sessionStorage.getItem(key));
   if(!draft)return false;
-  if(Date.now()-draft.updatedAt>draftLifetime){
+  if(!Number.isFinite(draft.updatedAt)||draft.updatedAt>Date.now()||Date.now()-draft.updatedAt>draftLifetime){
    sessionStorage.removeItem(key);
    return false;
   }
-  for(const field of draftFields)$("#"+field).value=draft.fields[field];
+  if(!draft.fields||!draft.addons)return false;
+  const fields=draft.fields;
+  if(!Object.hasOwn(pricing,fields.service)||!/^[1-4]$/.test(fields.rooms)
+   ||!["apartment","house","office","other"].includes(fields.propertyType)
+   ||!["once","weekly","biweekly","monthly"].includes(fields.frequency)
+   ||!/^([1-8])$/.test(fields.bathrooms)
+   ||(fields.area!==""&&(!Number.isFinite(Number(fields.area))||Number(fields.area)<10||Number(fields.area)>1500)))return false;
+  for(const field of draftFields)$("#"+field).value=fields[field];
   for(const addon of addonsList)$("#"+addon).checked=draft.addons[addon]===true;
   return true;
  }catch{return false;}
