@@ -5,7 +5,7 @@ let mode="login";
 let recovering=false;
 const authReturnUrl=new URL("/portal.html",location.origin);
 const nextRequest=new URLSearchParams(location.search).get("next");
-if(nextRequest?.startsWith("/booking.html?")){
+if(nextRequest==="/booking.html"||nextRequest?.startsWith("/booking.html?")){
  const requestUrl=new URL(nextRequest,location.origin);
  const requestLink=$("#customerRequestNav a");
  if(requestUrl.origin===location.origin&&requestUrl.pathname==="/booking.html"&&requestLink){
@@ -64,7 +64,7 @@ $("#forgotPassword").onclick=async()=>{
  }
  $("#forgotPassword").disabled=true;
  try{
-  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin+"/portal.html"});
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:authReturnUrl.href});
   if(error)throw error;
   $("#authMessage").textContent="Якщо адреса зареєстрована, надішлемо лист для відновлення пароля.";
  }catch(err){$("#authMessage").textContent=authError(err);}
@@ -103,15 +103,25 @@ $("#resetForm").onsubmit=async e=>{
  if(pass!==confirmPass){$("#resetMessage").textContent="Паролі не збігаються.";return;}
  if(pass.length<8){$("#resetMessage").textContent="Пароль повинен містити щонайменше 8 символів.";return;}
  btn.disabled=true;
- const {error}=await supabase.auth.updateUser({password:pass});
- btn.disabled=false;
- if(error){$("#resetMessage").textContent=error.message;return;}
- recovering=false;
- $("#resetPanel").classList.add("hidden");
- $("#resetMessage").textContent="";
- await supabase.auth.signOut();
- $("#authPanel").classList.remove("hidden");
- $("#authMessage").textContent="Пароль оновлено. Увійдіть з новим паролем.";
+ let passwordUpdated=false;
+ try{
+  const {error}=await supabase.auth.updateUser({password:pass});
+  if(error)throw error;
+  passwordUpdated=true;
+  $("#resetPassword").value="";
+  $("#resetConfirm").value="";
+  const {error:signOutError}=await supabase.auth.signOut();
+  if(signOutError)throw signOutError;
+  recovering=false;
+  $("#resetPanel").classList.add("hidden");
+  $("#resetMessage").textContent="";
+  $("#authPanel").classList.remove("hidden");
+  $("#authMessage").textContent="Пароль оновлено. Увійдіть з новим паролем.";
+ }catch(error){
+  $("#resetMessage").textContent=passwordUpdated
+   ?"Пароль оновлено, але вихід не завершено. Перезавантажте сторінку."
+   :authError(error);
+ }finally{btn.disabled=false;}
 };
 supabase.auth.onAuthStateChange((event)=>{
  if(event==="PASSWORD_RECOVERY"){
