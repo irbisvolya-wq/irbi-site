@@ -1,3 +1,4 @@
+import {unitEconomics} from "/finance-math.js?v=20261119-1";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.95.0";
 const db=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publishable_FeIEDPRGGRrp42q6mT3ACA_JvHSrhS1");
 const $=selector=>document.querySelector(selector);
@@ -10,6 +11,7 @@ $("#operatingDate").value=isoLocalDate(today);
 function message(text){$("#message").textContent=text;}
 function cell(tr,value){const td=document.createElement("td");td.textContent=String(value);tr.append(td);}
 async function render(){
+ currentUser=null;$("#content").classList.add("hide");
  const {data:{user},error:ue}=await db.auth.getUser();
  if(ue||!user){message("Увійдіть через кабінет IRBI.");return;}
  const {data:profile,error:pe}=await db.from("profiles").select("role").eq("id",user.id).maybeSingle();
@@ -41,7 +43,17 @@ async function renderMonthly(){
  if(!/^\d{4}-\d{2}$/.test(period))return;
  const {data,error}=await db.from("irbi_monthly_finance").select("*").eq("month_start",period+"-01").maybeSingle();
  if(error){message("Місячний звіт недоступний: "+error.message);return;}
- const d=data||{};
+ if(!data){
+  for(const id of ["monthJobs","monthSales","monthCash","monthDirect","monthFixed","monthResult","unitRevenue","unitDirect","unitContribution","unitOverhead","unitResult","unitMargin"])$("#"+id).textContent="Немає даних";
+  $("#monthWarning").textContent="Звіт доступний за поточний місяць і 23 попередні.";
+  await renderExpenseJournal().catch(()=>{$("#journalStatus").textContent="Не вдалося завантажити журнал. Оновіть сторінку.";});return;
+ }
+ const d=data;
+ const unit=unitEconomics(data);
+ for(const [id,key] of [["unitRevenue","averageRevenue"],["unitDirect","directPerJob"],["unitContribution","contributionPerJob"],["unitOverhead","overheadPerJob"],["unitResult","resultPerJob"],["unitMargin","margin"]]){
+  const value=unit?.[key];$("#"+id).textContent=value==null?"Немає даних":money(value)+(key==="margin"?" %":" ₴")+(Number(d.incomplete_labor_jobs)>0?" · попередньо":"");
+ }
+ await renderExpenseJournal().catch(()=>{$("#journalStatus").textContent="Не вдалося завантажити журнал. Оновіть сторінку.";});
  $("#monthJobs").textContent=Number(d.jobs_completed||0);
  $("#monthSales").textContent=money(d.sales_value);
  $("#monthCash").textContent=money(d.cash_received);
@@ -55,30 +67,52 @@ async function renderMonthly(){
 }
 $("#month").addEventListener("change",()=>renderMonthly().catch(e=>message(e.message)));
 $("#operatingForm").addEventListener("submit",async e=>{
- e.preventDefault();if(!currentUser)return;
+ e.preventDefault();if(!currentUser||e.currentTarget.querySelector("button").disabled)return;
  const btn=e.currentTarget.querySelector("button");
  const amount=Number($("#operatingAmount").value),description=$("#operatingDescription").value.trim();
  if(!Number.isFinite(amount)||amount<=0||description.length<3){message("Перевірте суму й опис витрати.");return;}
  btn.disabled=true;
+ try{
  const {error}=await db.from("operating_expenses").insert({
  expense_date:$("#operatingDate").value,category:$("#operatingCategory").value,
  amount,description,recorded_by:currentUser.id
  });
- btn.disabled=false;
  if(error){message("Не вдалося записати витрату: "+error.message);return;}
  $("#operatingAmount").value="";$("#operatingDescription").value="";
- await renderMonthly();message("Постійну витрату записано.");
+ await renderMonthly();message("Витрату бізнесу записано. Підсумки оновлено.");
+ }catch{message("З’єднання перервано. Перед повторним внесенням перевірте журнал, щоб не записати витрату двічі.");}finally{btn.disabled=false;}
 });
 $("#expenseForm").addEventListener("submit",async e=>{
  e.preventDefault();
- if(!currentUser)return;
+ if(!currentUser||e.currentTarget.querySelector("button").disabled)return;
  const button=e.currentTarget.querySelector("button");
  const amount=Number($("#amount").value),description=$("#description").value.trim();
  if(!Number.isFinite(amount)||amount<=0||description.length<3){message("Перевірте суму та пояснення.");return;}
  button.disabled=true;
+ try{
  const {error}=await db.from("booking_expenses").insert({booking_id:$("#booking").value,category:$("#category").value,amount,description,recorded_by:currentUser.id});
  if(error){button.disabled=false;message("Не вдалося додати витрату: "+error.message);return;}
  $("#amount").value="";$("#description").value="";
- await render();button.disabled=false;
+ await render();
+ }catch{message("З’єднання перервано. Перевірте журнал перед повторним внесенням витрати.");}finally{button.disabled=false;}
 });
+const expenseCategories={rent:"Оренда",marketing:"Реклама",software:"Програмні сервіси",communications:"Зв’язок",administration:"Адміністративні",tax:"Податки",other:"Інше",transport:"Транспорт",equipment:"Використання обладнання"};
+async function renderExpenseJournal(){
+ const status=$("#journalStatus");status.textContent="Завантаження журналу…";
+ const results=await Promise.all([
+  db.from("operating_expenses").select("expense_date,category,amount,description").order("expense_date",{ascending:false}).limit(100),
+  db.from("booking_expenses").select("booking_id,created_at,category,amount,description").order("created_at",{ascending:false}).limit(100)
+ ]);
+ for(const [index,result] of results.entries()){
+  const root=$(index===0?"#operatingRows":"#directExpenseRows");root.replaceChildren();
+  if(result.error){const tr=document.createElement("tr");cell(tr,"Журнал недоступний. Оновіть сторінку.");root.append(tr);continue;}
+  for(const entry of result.data||[]){const tr=document.createElement("tr");
+   const when=index===0?entry.expense_date:new Date(entry.created_at).toLocaleString("uk-UA");
+   [when,...(index===1?[entry.booking_id.slice(0,8)]:[]),expenseCategories[entry.category]||entry.category,money(entry.amount),entry.description].forEach(v=>cell(tr,v));root.append(tr);
+  }
+  if(!result.data?.length){const tr=document.createElement("tr");cell(tr,"Витрат ще не внесено.");root.append(tr);}
+ }
+ status.textContent=results.some(r=>r.error)?"Частину журналу не вдалося завантажити.":"У кожному журналі показано до 100 останніх записів за весь час. Місячні підсумки вище рахуються окремо за обраний місяць.";
+}
+$("#refreshFinance").addEventListener("click",async event=>{const button=event.currentTarget;if(button.disabled)return;button.disabled=true;try{await render();}catch{message("Не вдалося оновити звіт. Перевірте з’єднання.");}finally{button.disabled=false;}});
 render().catch(e=>message("Помилка: "+e.message));
