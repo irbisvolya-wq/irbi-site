@@ -40,7 +40,7 @@ async function refresh(){
  db.from("inventory_movements").select("id,created_at,item_id,movement_type,quantity,total_cost,booking_id").order("created_at",{ascending:false}).limit(100),
  db.from("irbi_inventory_reorder").select("name,unit,balance,reorder_quantity").order("name")
  ]);
- if(bal.error||mov.error||low.error){msg("Помилка завантаження складських даних.");return;}
+ if(bal.error||mov.error||low.error)throw new Error("Помилка завантаження складських даних.");
  $("#reorderRows").replaceChildren();
  for(const x of low.data||[]){const tr=document.createElement("tr");[x.name,fmt(x.balance)+" "+x.unit,fmt(x.reorder_quantity)+" "+x.unit].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.append(td);});$("#reorderRows").append(tr);}
  if(!(low.data||[]).length){const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=3;td.textContent="Немає матеріалів нижче мінімального залишку.";tr.append(td);$("#reorderRows").append(tr);}
@@ -49,25 +49,35 @@ async function refresh(){
  $("#movementRows").replaceChildren();
  for(const x of mov.data||[]){const tr=document.createElement("tr");const item=items.find(i=>i.id===x.item_id);[new Date(x.created_at).toLocaleString("uk-UA"),item?.name||x.item_id,x.movement_type,fmt(x.quantity),fmt(x.total_cost),x.booking_id?.slice(0,8)||"—"].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.append(td);});$("#movementRows").append(tr);}
 }
-$("#movement").addEventListener("submit",async e=>{
- e.preventDefault();const button=e.currentTarget.querySelector("button");const type=$("#type").value,booking=$("#booking").value,quantity=Number($("#qty").value);
- if(!items.length||!Number.isFinite(quantity)||quantity<=0||type==="use"&&!booking){msg("Оберіть матеріал, замовлення і додатну кількість.");return;}
+async function saveInventory(button,write,onSaved,label){
+ if(button.disabled)return;
  button.disabled=true;
+ try{
+  const {error}=await write();
+  if(error){msg("Не вдалося зберегти: "+error.message);return;}
+  try{await onSaved();msg(label);}
+  catch{msg(label+" Оновіть сторінку, щоб перевірити журнал. Повторно не вносьте цей запис.");}
+ }catch{msg("Збереження не підтверджено. Перед повторною дією перевірте журнал, щоб не створити дублікат.");}
+ finally{button.disabled=false;}
+}
+$("#movement").addEventListener("submit",async e=>{
+ e.preventDefault();const button=e.currentTarget.querySelector("button");if(button.disabled)return;const type=$("#type").value,booking=$("#booking").value,quantity=Number($("#qty").value);
+ if(!items.length||!Number.isFinite(quantity)||quantity<=0||["use","return"].includes(type)&&!booking){msg("Оберіть матеріал, замовлення і додатну кількість.");return;}
  const unitPrice=Number($("#purchasePrice").value);
  if(type==="purchase"&&(!$("#purchasePrice").value.trim()||!Number.isFinite(unitPrice)||unitPrice<0)){button.disabled=false;msg("Вкажіть закупівельну ціну за одиницю.");return;}
  const payload={item_id:$("#item").value,booking_id:booking||null,movement_type:type,quantity,note:$("#note").value.trim()||null,recorded_by:userId};
  if(type==="purchase"){payload.purchase_unit_price=unitPrice;payload.supplier=$("#supplier").value.trim()||null;payload.invoice_reference=$("#invoiceRef").value.trim()||null;}
- const {error}=await db.from("inventory_movements").insert(payload);
- button.disabled=false;
- if(error){msg("Не вдалося зберегти: "+error.message);return;}
- $("#qty").value="";$("#note").value="";$("#purchasePrice").value="";$("#supplier").value="";$("#invoiceRef").value="";msg("Рух матеріалу збережено.");await reloadMaterials();await refresh();
+ await saveInventory(button,()=>db.from("inventory_movements").insert(payload),async()=>{
+ $("#qty").value="";$("#note").value="";$("#purchasePrice").value="";$("#supplier").value="";$("#invoiceRef").value="";
+ await reloadMaterials();await refresh();
+ },"Рух матеріалу збережено.");
 });
 $("#newItem").addEventListener("submit",async e=>{
  e.preventDefault();if(role!=="admin")return;
- const btn=e.currentTarget.querySelector("button");btn.disabled=true;
- const {error}=await db.from("inventory_items").insert({name:$("#name").value.trim(),category:$("#category").value,unit:$("#unit").value,unit_cost:Number($("#cost").value),reorder_level:Number($("#minimum").value)});
- btn.disabled=false;if(error){msg("Помилка: "+error.message);return;}
- msg("Матеріал додано.");$("#newItem").reset();await reloadMaterials();await refresh();
+ const btn=e.currentTarget.querySelector("button");
+ const payload={name:$("#name").value.trim(),category:$("#category").value,unit:$("#unit").value,unit_cost:Number($("#cost").value),reorder_level:Number($("#minimum").value)};
+ if(!payload.name||!Number.isFinite(payload.unit_cost)||payload.unit_cost<0||!Number.isFinite(payload.reorder_level)||payload.reorder_level<0){msg("Перевірте назву, ціну та мінімальний залишок.");return;}
+ await saveInventory(btn,()=>db.from("inventory_items").insert(payload),async()=>{$("#newItem").reset();await reloadMaterials();await refresh();},"Матеріал додано.");
 });
 
 function syncPurchaseFields(){
@@ -86,7 +96,7 @@ function showItemPrice(){
 $("#priceItem").addEventListener("change",showItemPrice);
 async function reloadMaterials(){
  const {data,error}=await db.from("inventory_items").select("id,name,unit,unit_cost,reorder_level,active").eq("active",true).order("name");
- if(error){msg("Помилка завантаження довідника: "+error.message);return;}
+ if(error)throw error;
  items=data||[];
  $("#item").replaceChildren(...items.map(i=>option(i.id,i.name+" ("+i.unit+")")));
  if(role==="admin"){$("#priceItem").replaceChildren(...items.map(i=>option(i.id,i.name+" ("+i.unit+")")));showItemPrice();}
@@ -95,10 +105,7 @@ $("#editPrice").addEventListener("submit",async e=>{
  e.preventDefault();if(role!=="admin")return;
  const itemId=$("#priceItem").value,cost=Number($("#newPrice").value),min=Number($("#newMinimum").value);
  if(!itemId||!Number.isFinite(cost)||cost<0||!Number.isFinite(min)||min<0){msg("Перевірте ціну та мінімальний залишок.");return;}
- const btn=e.currentTarget.querySelector("button");btn.disabled=true;
- const {error}=await db.from("inventory_items").update({unit_cost:cost,reorder_level:min}).eq("id",itemId);
- btn.disabled=false;
- if(error){msg("Не вдалося змінити параметри: "+error.message);return;}
- await reloadMaterials();await refresh();msg("Ціну та мінімальний залишок оновлено.");
+ const btn=e.currentTarget.querySelector("button");
+ await saveInventory(btn,()=>db.from("inventory_items").update({unit_cost:cost,reorder_level:min}).eq("id",itemId),async()=>{await reloadMaterials();await refresh();},"Ціну та мінімальний залишок оновлено.");
 });
 load().catch(e=>msg("Помилка: "+e.message));

@@ -2,6 +2,7 @@ import {createClient} from "https://esm.sh/@supabase/supabase-js@2.95.0";
 const db=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publishable_FeIEDPRGGRrp42q6mT3ACA_JvHSrhS1");
 const $=s=>document.querySelector(s);
 let users=[],orders=[];
+let payrollBusy=false;
 const money=x=>new Intl.NumberFormat("uk-UA",{maximumFractionDigits:2}).format(Number(x||0));
 const msg=s=>$("#message").textContent=s;
 const opt=(value,label)=>{const e=document.createElement("option");e.value=value;e.textContent=label;return e;};
@@ -33,20 +34,24 @@ async function load(){
  }
  $("#booking").replaceChildren(...orders.map(b=>opt(b.id,b.id.slice(0,8)+" · "+new Date(b.scheduled_at).toLocaleDateString("uk-UA")+" · "+b.status)));
  $("#earnings").replaceChildren();
- for(const x of e.data||[]){const tr=document.createElement("tr");[x.booking_id.slice(0,8),users.find(p=>p.id===x.cleaner_id)?.full_name||x.cleaner_id.slice(0,8),x.entry_type,money(x.amount)+" ₴",x.status].forEach(y=>td(tr,y));$("#earnings").append(tr);}
+ for(const x of e.data||[]){const tr=document.createElement("tr");[x.booking_id.slice(0,8),users.find(p=>p.id===x.cleaner_id)?.full_name||x.cleaner_id.slice(0,8),x.entry_type,x.amount==null?"Не погоджено":money(x.amount)+" ₴",x.status].forEach(y=>td(tr,y));$("#earnings").append(tr);}
  $("#payrollForm").querySelectorAll("button").forEach(x=>x.disabled=!orders.length);
  msg("Кабінет персоналу завантажено.");
 }
 $("#payrollForm").addEventListener("click",async e=>{
- const button=e.target.closest("button[data-action]");if(!button)return;
+ const button=e.target.closest("button[data-action]");if(!button||button.disabled||payrollBusy)return;
  const booking=orders.find(x=>x.id===$("#booking").value);
  const amount=Number($("#amount").value),action=button.dataset.action;
  if(!booking||!Number.isFinite(amount)||amount<0||(action==="approve"&&amount===0)){msg("Виберіть замовлення та коректну суму.");return;}
  if(action==="paid"&&!confirm("Кошти вже фактично виплачені працівнику?"))return;
- button.disabled=true;
- const {error}=await db.rpc("irbi_admin_payroll_action",{p_booking:booking.id,p_cleaner:booking.assigned_cleaner_id,p_entry_type:$("#type").value,p_amount:amount,p_action:action,p_note:$("#note").value.trim()||null});
- if(error){msg(error.message);button.disabled=false;return;}
- await load();
- msg(action==="paid"?"Виплату зафіксовано.":"Нарахування збережено.");
+ payrollBusy=true;
+ const controls=[...$("#payrollForm").querySelectorAll("button")];controls.forEach(b=>b.disabled=true);
+ try{
+  const {error}=await db.rpc("irbi_admin_payroll_action",{p_booking:booking.id,p_cleaner:booking.assigned_cleaner_id,p_entry_type:$("#type").value,p_amount:amount,p_action:action,p_note:$("#note").value.trim()||null});
+  if(error){msg(error.message);return;}
+  try{await load();msg(action==="paid"?"Виплату зафіксовано.":"Нарахування збережено.");}
+  catch{msg("Дію збережено. Оновіть реєстр перед наступною зміною.");}
+ }catch{msg("Збереження не підтверджено. Перевірте реєстр перед повторною дією.");}
+ finally{payrollBusy=false;controls.forEach(b=>b.disabled=!orders.length);}
 });
 load().catch(e=>msg("Помилка: "+e.message));

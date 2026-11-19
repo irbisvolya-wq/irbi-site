@@ -1,9 +1,13 @@
+import {loadVisibleOrders} from "/order-list.js?v=20261119-1";
+import {jobDetails} from "/job-details.js?v=20261119-1";
+import {loadScheduleBookings} from "/schedule.js?v=20261119-1";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.95.0";
 const supabase=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publishable_FeIEDPRGGRrp42q6mT3ACA_JvHSrhS1",{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=s=>document.querySelector(s);
 const statusLabels={pending:"Очікує підтвердження",confirmed:"Підтверджено",assigned:"Призначено клінера",accepted:"Клінер прийняв",en_route:"Клінер у дорозі",arrived:"Клінер на місці",in_progress:"Виконується",completed:"Завершено",cancelled:"Скасовано",canceled:"Скасовано"};
 let mode="login";
 let recovering=false;
+let visibleOrderLimit=50;
 const authReturnUrl=new URL("/portal.html",location.origin);
 const nextRequest=new URLSearchParams(location.search).get("next");
 if(nextRequest==="/booking.html"||nextRequest?.startsWith("/booking.html?")){
@@ -133,10 +137,18 @@ supabase.auth.onAuthStateChange((event)=>{
   $("#resetPassword").focus();
  }
 });
-async function render(){const {data:{user}}=await supabase.auth.getUser();$("#authPanel").classList.toggle("hidden",!!user);$("#dashboard").classList.toggle("hidden",!user||recovering);$("#resetPanel").classList.toggle("hidden",!recovering);if(recovering){$("#authPanel").classList.add("hidden");return;}if(!user)return;const {data:profile,error:profileError}=await supabase.from("profiles").select("id,full_name,role").eq("id",user.id).maybeSingle();if(profileError){$("#roleNotice").textContent="Помилка перевірки ролі. Зверніться до підтримки.";return;}const role=["customer","cleaner","dispatcher","admin"].includes(profile?.role)?profile.role:"customer";$("#staffNav").classList.toggle("hidden",role==="customer");$("#messagesLink").classList.toggle("hidden",!["admin","dispatcher"].includes(role));$("#customerRequestNav").classList.toggle("hidden",role!=="customer");
+let rendering=false,renderQueued=false;
+async function render(){
+ if(rendering){renderQueued=true;return;}
+ rendering=true;
+ try{await renderDashboard();}
+ finally{rendering=false;if(renderQueued){renderQueued=false;return render();}}
+}
+async function renderDashboard(){const {data:{user}}=await supabase.auth.getUser();$("#authPanel").classList.toggle("hidden",!!user);$("#dashboard").classList.toggle("hidden",!user||recovering);$("#resetPanel").classList.toggle("hidden",!recovering);if(recovering){$("#authPanel").classList.add("hidden");return;}if(!user)return;const {data:profile,error:profileError}=await supabase.from("profiles").select("id,full_name,role").eq("id",user.id).maybeSingle();if(profileError){$("#roleNotice").textContent="Помилка перевірки ролі. Зверніться до підтримки.";return;}const role=["customer","cleaner","dispatcher","admin"].includes(profile?.role)?profile.role:"customer";$("#staffNav").classList.toggle("hidden",role==="customer");$("#messagesLink").classList.toggle("hidden",!["admin","dispatcher"].includes(role));$("#customerRequestNav").classList.toggle("hidden",role!=="customer");
+$("#earningsLink").classList.toggle("hidden",role!=="cleaner");
 $("#staffManagementLink").classList.toggle("hidden",role!=="admin");
 $("#financeManagementLink").classList.toggle("hidden",role!=="admin");
-$("#dashboardTitle").textContent=role==="admin"?"Панель адміністратора":role==="dispatcher"?"Панель координатора":role==="cleaner"?"Кабінет клінера":"Кабінет клієнта";$("#accountInfo").textContent=(profile?.full_name||user.email)+" · "+user.email;$("#roleNotice").textContent=role==="admin"||role==="dispatcher"?"Керуйте робочими замовленнями та графіком. Фінанси й персонал доступні лише адміністратору.":role==="cleaner"?"Тут ваші призначені роботи, статуси та чек-листи.":"Тут можна надіслати запит на прибирання. Час і остаточну ціну підтвердить команда IRBI.";$("#ordersTitle").textContent=role==="cleaner"?"Призначені замовлення":role==="admin"||role==="dispatcher"?"Замовлення компанії":"Мої замовлення";$("#ordersStatus").textContent="Завантаження…";let query=supabase.from("bookings").select("id,scheduled_at,status,total,assigned_cleaner_id,service_type,rooms,bathrooms,area_m2,property_type,address,apartment,entrance,floor,contact_phone,created_at,cleaning_features,photo_consent,duration_minutes,scheduled_end_at,updated_at").order("created_at",{ascending:false}).limit(50);if(role==="cleaner")query=query.eq("assigned_cleaner_id",user.id);if(role==="customer")query=query.eq("customer_id",user.id);const {data:orders,error}=await query;if(error){$("#ordersStatus").textContent="Немає доступу до даних або помилка завантаження.";return;}$("#ordersBody").replaceChildren();for(const order of orders||[]){const tr=document.createElement("tr");for(const item of [order.id.slice(0,8),order.scheduled_at?new Date(order.scheduled_at).toLocaleString("uk-UA"):"—",(statusLabels[order.status]||order.status),order.total==null?"—":order.total+" ₴"]){const td=document.createElement("td");td.textContent=item;tr.append(td);}$("#ordersBody").append(tr);}$("#ordersStatus").textContent=orders?.length?"":"Поки немає замовлень.";if(role!=="customer") await staffPanel(role,user,orders||[]);}
+$("#dashboardTitle").textContent=role==="admin"?"Панель адміністратора":role==="dispatcher"?"Панель координатора":role==="cleaner"?"Кабінет клінера":"Кабінет клієнта";$("#accountInfo").textContent=(profile?.full_name||user.email)+" · "+user.email;$("#roleNotice").textContent=role==="admin"||role==="dispatcher"?"Керуйте робочими замовленнями та графіком. Фінанси й персонал доступні лише адміністратору.":role==="cleaner"?"Тут ваші призначені роботи, статуси та чек-листи.":"Тут можна надіслати запит на прибирання. Час і остаточну ціну підтвердить команда IRBI.";$("#ordersTitle").textContent=role==="cleaner"?"Призначені замовлення":role==="admin"||role==="dispatcher"?"Замовлення компанії":"Мої замовлення";$("#ordersStatus").textContent="Завантаження…";let orders,hasMore;try{({orders,hasMore}=await loadVisibleOrders(supabase,role,user.id,visibleOrderLimit));}catch{$("#ordersStatus").textContent="Немає доступу до даних або помилка завантаження.";return;}$("#ordersBody").replaceChildren();for(const order of orders||[]){const tr=document.createElement("tr");for(const item of [order.id.slice(0,8),order.scheduled_at?new Date(order.scheduled_at).toLocaleString("uk-UA"):"—",(statusLabels[order.status]||order.status),order.total==null?"—":order.total+" ₴"]){const td=document.createElement("td");td.textContent=item;tr.append(td);}$("#ordersBody").append(tr);}$("#ordersStatus").textContent=orders?.length?"":"Поки немає замовлень.";document.querySelector("#moreOrders")?.remove();if(hasMore){const more=document.createElement("button");more.id="moreOrders";more.type="button";more.className="btn btn-secondary";more.textContent="Показати ще 50 замовлень";more.onclick=async()=>{if(more.disabled)return;more.disabled=true;visibleOrderLimit+=50;try{await render();}catch{$("#ordersStatus").textContent="Не вдалося завантажити замовлення. Повторіть спробу.";}finally{more.disabled=false;}};$("#ordersStatus").after(more);}if(role!=="customer") await staffPanel(role,user,orders||[]);}
 supabase.auth.onAuthStateChange(()=>{setTimeout(render,0);});render();
 const panel=document.createElement("div");panel.className="portal-card";panel.id="staffPanel";$("#dashboard").append(panel);
 const statusNext={assigned:["accept","Прийняти"],accepted:["depart","Виїхав"],en_route:["arrive","На місці"],arrived:["start","Почати"],in_progress:["finish","Завершити"]};
@@ -148,8 +160,8 @@ async function staffPanel(role,user,orders){
  for(const b of orders){
  const block=document.createElement("div");block.style.cssText="border:1px solid #ddd;padding:15px;margin:10px 0;border-radius:10px";
  const title=document.createElement("h3");title.textContent=b.id.slice(0,8)+" · "+(statusLabels[b.status]||b.status);block.append(title);if(["pending","confirmed"].includes(b.status)&&b.scheduled_at&&new Date(b.scheduled_at)<new Date()){const overdue=document.createElement("p");overdue.className="notice";overdue.setAttribute("role","status");overdue.textContent="Потрібна увага: бажаний час заявки вже минув. Узгодьте з клієнтом новий час перед підтвердженням.";block.append(overdue);}
- const detail=document.createElement("div");detail.className="notice";const address=role==="cleaner"&&["pending","confirmed"].includes(b.status)?"Після призначення":([b.address,b.apartment?"кв. "+b.apartment:"",b.floor?"поверх "+b.floor:""].filter(Boolean).join(", ")||"Не вказано");
-const fields=[["Послуга",b.service_type||"—"],["Дата",b.scheduled_at?new Date(b.scheduled_at).toLocaleString("uk-UA"):"—"],["Адреса",address],["Тип",b.property_type||"—"],["Кімнат",b.rooms??"—"],["Санвузлів",b.bathrooms??"—"],["Площа",b.area_m2?b.area_m2+" м²":"—"],["Тривалість",b.duration_minutes?b.duration_minutes+" хв":"Не задано"],["Вартість",b.total==null?"—":b.total+" ₴"]];for(const [key,value] of fields){const row=document.createElement("p");row.style.margin="4px 0";const strong=document.createElement("strong");strong.textContent=key+": ";row.append(strong,document.createTextNode(String(value)));detail.append(row);}block.append(detail);
+ const detail=document.createElement("div");detail.className="notice";detail.style.overflowWrap="anywhere";
+const fields=jobDetails(b,role);for(const [key,value] of fields){const row=document.createElement("p");row.style.margin="4px 0";const strong=document.createElement("strong");strong.textContent=key+": ";row.append(strong,document.createTextNode(String(value)));detail.append(row);}block.append(detail);
 const info=document.createElement("p");info.setAttribute("role","status");block.append(info);
  if(["admin","dispatcher"].includes(role)&&["pending","confirmed"].includes(b.status)&&!b.assigned_cleaner_id){
   const prepare=document.createElement("button");prepare.type="button";prepare.className="btn btn-secondary";prepare.textContent="Узгодити час і вартість";prepare.onclick=()=>showRequestConfirmation(b,block,info);block.append(prepare);
@@ -170,7 +182,18 @@ const info=document.createElement("p");info.setAttribute("role","status");block.
  panel.append(block);
  }
 }
-async function action(id,kind,cleaner,info){info.textContent="Зберігаємо…";const {error}=await supabase.rpc("irbi_staff_action",{p_booking:id,p_action:kind,p_cleaner:cleaner,p_note:null});if(error){info.textContent=error.message;return;}await render();}
+const pendingActions=new Set();
+async function action(id,kind,cleaner,info){
+ if(pendingActions.has(id))return;
+ pendingActions.add(id);info.textContent="Зберігаємо…";
+ try{
+  const {error}=await supabase.rpc("irbi_staff_action",{p_booking:id,p_action:kind,p_cleaner:cleaner,p_note:null});
+  if(error){const known={cleaner_unavailable:"Клінер позначив цей час як недоступний.",duration_required_for_assignment:"Спочатку погодьте тривалість прибирання.",required_checklist_incomplete:"Завершіть обов’язкові пункти чек-листа.",invalid_transition:"Статус уже змінився. Оновіть сторінку.",not_assigned:"Це замовлення вам не призначено."};info.textContent=error.code==='23P01'?"На цей час у клінера вже є замовлення.":known[error.message]||"Не вдалося виконати дію. Оновіть замовлення й перевірте його стан.";return;}
+  info.textContent="Дію збережено.";
+  try{await render();}catch{info.textContent="Дію збережено. Оновіть сторінку для перевірки нового стану.";}
+ }catch{info.textContent="Збереження не підтверджено. Перевірте актуальний статус перед повторною дією.";}
+ finally{pendingActions.delete(id);}
+}
 async function showChecklist(id,block,info){
  const prev=block.querySelector(".items");if(prev){prev.remove();return;}
  const holder=document.createElement("div");holder.className="items";holder.style.marginTop="12px";block.append(holder);
@@ -278,7 +301,10 @@ async function renderSchedule(role,user,orders,root){
  const staff=role==="cleaner"?[{id:user.id,full_name:"Мій графік"}]:(await supabase.from("profiles").select("id,full_name").eq("role","cleaner")).data||[];
  const {data:shifts,error}=await supabase.from("cleaner_availability").select("cleaner_id,starts_at,ends_at,availability_type,note").gte("ends_at",from.toISOString()).lt("starts_at",until.toISOString());
  if(error){const msg=document.createElement("p");msg.textContent="Графік недоступний: "+error.message;box.append(msg);}
- const events=(orders||[]).filter(o=>o.scheduled_at&&o.status!=="cancelled");
+ let events=[];
+ let bookingsUnavailable=false;
+ try{events=await loadScheduleBookings(supabase,role,user.id,from,until);}
+ catch{bookingsUnavailable=true;const msg=document.createElement("p");msg.setAttribute("role","status");msg.textContent="Замовлення календаря не завантажено. Оновіть сторінку перед призначенням клінера.";box.append(msg);}
  const table=document.createElement("table");table.className="portal-table";
  const head=document.createElement("thead");const hr=document.createElement("tr");for(const name of ["Дата / час","Клінер","Подія"]){const c=document.createElement("th");c.textContent=name;hr.append(c);}head.append(hr);table.append(head);
  const tbody=document.createElement("tbody");const records=[];
@@ -286,7 +312,7 @@ async function renderSchedule(role,user,orders,root){
  for(const shift of shifts||[]){if(role==="cleaner"&&shift.cleaner_id!==user.id)continue;records.push({time:shift.starts_at,person:staff.find(x=>x.id===shift.cleaner_id)?.full_name||"Клінер",label:(shift.availability_type==="unavailable"?"Недоступний":"Доступний")+" до "+new Date(shift.ends_at).toLocaleString("uk-UA")});}
  records.sort((a,b)=>new Date(a.time)-new Date(b.time));
  for(const event of records){const tr=document.createElement("tr");for(const text of [new Date(event.time).toLocaleString("uk-UA"),event.person,event.label]){const td=document.createElement("td");td.textContent=text;tr.append(td);}tbody.append(tr);}table.append(tbody);box.append(table);
- if(!records.length){const p=document.createElement("p");p.textContent="На найближчі 14 днів записів немає.";box.append(p);}
+ if(!records.length&&!error&&!bookingsUnavailable){const p=document.createElement("p");p.textContent="На найближчі 14 днів записів немає.";box.append(p);}
  if(role==="cleaner"){
  const form=document.createElement("form");form.style.marginTop="14px";
  const start=document.createElement("input");start.type="datetime-local";start.required=true;

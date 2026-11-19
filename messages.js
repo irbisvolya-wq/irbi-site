@@ -4,6 +4,7 @@ const $=s=>document.querySelector(s);
 const info=t=>$("#status").textContent=t;
 let orders=[];
 let refreshVersion=0;
+let sending=false;
 const drafts=new Map();
 function option(id,label){const el=document.createElement("option");el.value=id;el.textContent=label;return el;}
 async function load(){
@@ -22,15 +23,21 @@ async function load(){
 }
 async function refresh(){
  const version=++refreshVersion;
- const id=$("#booking").value;if(!id){$("#messages").replaceChildren();return;}
+ const id=$("#booking").value;
+ $("#messages").textContent=id?"Завантажуємо листування…":"";
+ if(!id){$("#orderDetails").textContent="";return true;}
  const b=orders.find(o=>o.id===id);
  $("#orderDetails").textContent="Заявка "+id.slice(0,8)+" · "+(b?.status||"");
- const {data,error}=await db.from("irbi_booking_messages").select("sender_id,audience,body,created_at").eq("booking_id",id).order("created_at",{ascending:false}).limit(100);
- if(version!==refreshVersion)return;
- if(error){info("Не вдалося завантажити листування: "+error.message);return;}
+ let response;
+ try{response=await db.from("irbi_booking_messages").select("sender_id,audience,body,created_at").eq("booking_id",id).order("created_at",{ascending:false}).limit(100);}
+ catch{if(version!==refreshVersion)return false;$("#messages").textContent="Не вдалося завантажити листування. Натисніть «Оновити повідомлення».";return false;}
+ if(version!==refreshVersion)return false;
+ const {data,error}=response;
+ if(error){$("#messages").textContent="Не вдалося завантажити листування. Натисніть «Оновити повідомлення».";return false;}
  $("#messages").replaceChildren();
- if(!data?.length){$("#messages").textContent="Повідомлень за цією заявкою немає.";return;}
+ if(!data?.length){$("#messages").textContent="Повідомлень за цією заявкою немає.";return true;}
  for(const m of data.reverse()){const p=document.createElement("div");p.className="chat";p.textContent=(m.audience==="staff"?"Клієнт":"IRBI")+" · "+new Date(m.created_at).toLocaleString("uk-UA")+"\n"+m.body;$("#messages").append(p);}
+ return true;
 }
 $("#reply").addEventListener("input",()=>drafts.set($("#booking").value,$("#reply").value));
 $("#booking").addEventListener("change",()=>{
@@ -42,7 +49,9 @@ $("#booking").addEventListener("change",()=>{
 $("#reload").addEventListener("click",()=>refresh().catch(e=>info(e.message)));
 $("#replyForm").addEventListener("submit",async e=>{
  e.preventDefault();
+ if(sending)return;
  const id=$("#booking").value,body=$("#reply").value.trim();if(!id||!body)return;
+ sending=true;
  const button=e.currentTarget.querySelector("button");
  const booking=$("#booking"),reply=$("#reply");
  button.disabled=booking.disabled=reply.disabled=true;
@@ -52,10 +61,12 @@ $("#replyForm").addEventListener("submit",async e=>{
   drafts.delete(id);
   reply.value="";
   info("Відповідь збережено, клієнту створено сповіщення.");
-  await refresh();
+  const loaded=await refresh();
+  if(!loaded)info("Відповідь збережено. Листування не оновлено — натисніть «Оновити повідомлення». Повторно надсилати відповідь не потрібно.");
  }catch(error){
-  info("Помилка: "+error.message);
+  info("Не вдалося підтвердити відправлення. Текст залишено у полі. Оновіть листування перед повторним надсиланням.");
  }finally{
+  sending=false;
   button.disabled=booking.disabled=reply.disabled=false;
  }
 });
