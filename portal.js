@@ -137,7 +137,14 @@ supabase.auth.onAuthStateChange((event)=>{
   $("#resetPassword").focus();
  }
 });
-async function render(){const {data:{user}}=await supabase.auth.getUser();$("#authPanel").classList.toggle("hidden",!!user);$("#dashboard").classList.toggle("hidden",!user||recovering);$("#resetPanel").classList.toggle("hidden",!recovering);if(recovering){$("#authPanel").classList.add("hidden");return;}if(!user)return;const {data:profile,error:profileError}=await supabase.from("profiles").select("id,full_name,role").eq("id",user.id).maybeSingle();if(profileError){$("#roleNotice").textContent="Помилка перевірки ролі. Зверніться до підтримки.";return;}const role=["customer","cleaner","dispatcher","admin"].includes(profile?.role)?profile.role:"customer";$("#staffNav").classList.toggle("hidden",role==="customer");$("#messagesLink").classList.toggle("hidden",!["admin","dispatcher"].includes(role));$("#customerRequestNav").classList.toggle("hidden",role!=="customer");
+let rendering=false,renderQueued=false;
+async function render(){
+ if(rendering){renderQueued=true;return;}
+ rendering=true;
+ try{await renderDashboard();}
+ finally{rendering=false;if(renderQueued){renderQueued=false;return render();}}
+}
+async function renderDashboard(){const {data:{user}}=await supabase.auth.getUser();$("#authPanel").classList.toggle("hidden",!!user);$("#dashboard").classList.toggle("hidden",!user||recovering);$("#resetPanel").classList.toggle("hidden",!recovering);if(recovering){$("#authPanel").classList.add("hidden");return;}if(!user)return;const {data:profile,error:profileError}=await supabase.from("profiles").select("id,full_name,role").eq("id",user.id).maybeSingle();if(profileError){$("#roleNotice").textContent="Помилка перевірки ролі. Зверніться до підтримки.";return;}const role=["customer","cleaner","dispatcher","admin"].includes(profile?.role)?profile.role:"customer";$("#staffNav").classList.toggle("hidden",role==="customer");$("#messagesLink").classList.toggle("hidden",!["admin","dispatcher"].includes(role));$("#customerRequestNav").classList.toggle("hidden",role!=="customer");
 $("#earningsLink").classList.toggle("hidden",role!=="cleaner");
 $("#staffManagementLink").classList.toggle("hidden",role!=="admin");
 $("#financeManagementLink").classList.toggle("hidden",role!=="admin");
