@@ -4,6 +4,8 @@ const db=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publishable
 const $=selector=>document.querySelector(selector);
 const money=v=>new Intl.NumberFormat("uk-UA",{maximumFractionDigits:2}).format(Number(v||0));
 let currentUser=null;
+let monthlyRequest=0;
+const monthlyMetrics=["monthJobs","monthSales","monthCash","monthDirect","monthFixed","monthResult","unitRevenue","unitDirect","unitContribution","unitOverhead","unitResult","unitMargin"];
 const today=new Date();
 const isoLocalDate=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
 $("#month").value=isoLocalDate(today).slice(0,7);
@@ -39,12 +41,24 @@ async function render(){
  $("#expenseForm").querySelector("button").disabled=!orders.length;
 }
 async function renderMonthly(){
+ const request=++monthlyRequest;
  const period=$("#month").value;
- if(!/^\d{4}-\d{2}$/.test(period))return;
- const {data,error}=await db.from("irbi_monthly_finance").select("*").eq("month_start",period+"-01").maybeSingle();
- if(error){message("Місячний звіт недоступний: "+error.message);return;}
+ for(const id of monthlyMetrics)$("#"+id).textContent="—";
+ $("#monthWarning").textContent="Завантаження звіту…";
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)){
+  $("#monthWarning").textContent="Оберіть місяць для звіту.";return;
+ }
+ let response;
+ try{response=await db.from("irbi_monthly_finance").select("*").eq("month_start",period+"-01").maybeSingle();}
+ catch{
+  if(request!==monthlyRequest)return;
+  $("#monthWarning").textContent="Не вдалося завантажити цей місяць. Оновіть фінанси.";return;
+ }
+ if(request!==monthlyRequest)return;
+ const {data,error}=response;
+ if(error){$("#monthWarning").textContent="Місячний звіт недоступний. Оновіть фінанси.";message("Місячний звіт недоступний: "+error.message);return;}
  if(!data){
-  for(const id of ["monthJobs","monthSales","monthCash","monthDirect","monthFixed","monthResult","unitRevenue","unitDirect","unitContribution","unitOverhead","unitResult","unitMargin"])$("#"+id).textContent="Немає даних";
+  for(const id of monthlyMetrics)$("#"+id).textContent="Немає даних";
   $("#monthWarning").textContent="Звіт доступний за поточний місяць і 23 попередні.";
   await renderExpenseJournal().catch(()=>{$("#journalStatus").textContent="Не вдалося завантажити журнал. Оновіть сторінку.";});return;
  }
@@ -54,6 +68,7 @@ async function renderMonthly(){
   const value=unit?.[key];$("#"+id).textContent=value==null?"Немає даних":money(value)+(key==="margin"?" %":" ₴")+(Number(d.incomplete_labor_jobs)>0?" · попередньо":"");
  }
  await renderExpenseJournal().catch(()=>{$("#journalStatus").textContent="Не вдалося завантажити журнал. Оновіть сторінку.";});
+ if(request!==monthlyRequest)return;
  $("#monthJobs").textContent=Number(d.jobs_completed||0);
  $("#monthSales").textContent=money(d.sales_value);
  $("#monthCash").textContent=money(d.cash_received);
