@@ -1,3 +1,4 @@
+import {loadScheduleBookings} from "/schedule.js?v=20261119-1";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.95.0";
 const supabase=createClient("https://xcfbzlyososeetbnrvhf.supabase.co","sb_publishable_FeIEDPRGGRrp42q6mT3ACA_JvHSrhS1",{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=s=>document.querySelector(s);
@@ -278,7 +279,10 @@ async function renderSchedule(role,user,orders,root){
  const staff=role==="cleaner"?[{id:user.id,full_name:"Мій графік"}]:(await supabase.from("profiles").select("id,full_name").eq("role","cleaner")).data||[];
  const {data:shifts,error}=await supabase.from("cleaner_availability").select("cleaner_id,starts_at,ends_at,availability_type,note").gte("ends_at",from.toISOString()).lt("starts_at",until.toISOString());
  if(error){const msg=document.createElement("p");msg.textContent="Графік недоступний: "+error.message;box.append(msg);}
- const events=(orders||[]).filter(o=>o.scheduled_at&&o.status!=="cancelled");
+ let events=[];
+ let bookingsUnavailable=false;
+ try{events=await loadScheduleBookings(supabase,role,user.id,from,until);}
+ catch{bookingsUnavailable=true;const msg=document.createElement("p");msg.setAttribute("role","status");msg.textContent="Замовлення календаря не завантажено. Оновіть сторінку перед призначенням клінера.";box.append(msg);}
  const table=document.createElement("table");table.className="portal-table";
  const head=document.createElement("thead");const hr=document.createElement("tr");for(const name of ["Дата / час","Клінер","Подія"]){const c=document.createElement("th");c.textContent=name;hr.append(c);}head.append(hr);table.append(head);
  const tbody=document.createElement("tbody");const records=[];
@@ -286,7 +290,7 @@ async function renderSchedule(role,user,orders,root){
  for(const shift of shifts||[]){if(role==="cleaner"&&shift.cleaner_id!==user.id)continue;records.push({time:shift.starts_at,person:staff.find(x=>x.id===shift.cleaner_id)?.full_name||"Клінер",label:(shift.availability_type==="unavailable"?"Недоступний":"Доступний")+" до "+new Date(shift.ends_at).toLocaleString("uk-UA")});}
  records.sort((a,b)=>new Date(a.time)-new Date(b.time));
  for(const event of records){const tr=document.createElement("tr");for(const text of [new Date(event.time).toLocaleString("uk-UA"),event.person,event.label]){const td=document.createElement("td");td.textContent=text;tr.append(td);}tbody.append(tr);}table.append(tbody);box.append(table);
- if(!records.length){const p=document.createElement("p");p.textContent="На найближчі 14 днів записів немає.";box.append(p);}
+ if(!records.length&&!error&&!bookingsUnavailable){const p=document.createElement("p");p.textContent="На найближчі 14 днів записів немає.";box.append(p);}
  if(role==="cleaner"){
  const form=document.createElement("form");form.style.marginTop="14px";
  const start=document.createElement("input");start.type="datetime-local";start.required=true;
