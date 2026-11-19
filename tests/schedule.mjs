@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const {loadScheduleBookings}=await import('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('schedule.js','utf8')).toString('base64'));
+const from=new Date('2026-11-19T00:00:00Z'),until=new Date('2026-12-03T00:00:00Z');
+function fixture(pages){const calls=[];let page=0;const db={from(table){const c={table,filters:[],orders:[]};calls.push(c);const q={select(s){c.select=s;return q;},not(...args){c.filters.push(['not',...args]);return q;},lt(...args){c.filters.push(['lt',...args]);return q;},or(...args){c.filters.push(['or',...args]);return q;},order(...args){c.orders.push(args);return q;},eq(...args){c.filters.push(['eq',...args]);return q;},async range(a,b){c.range=[a,b];return pages[page++];}};return q;}};return {db,calls};}
+test('calendar fetches all pages independently of recent-order limit',async()=>{const f=fixture([{data:Array.from({length:500},(_,id)=>({id}))},{data:[{id:501}]}]);const rows=await loadScheduleBookings(f.db,'admin','admin',from,until);assert.equal(rows.length,501);assert.deepEqual(f.calls.map(c=>c.range),[[0,499],[500,999]]);});
+test('calendar includes overlapping work and excludes completed and cancelled bookings',async()=>{const f=fixture([{data:[]}]);await loadScheduleBookings(f.db,'dispatcher','staff',from,until);assert.deepEqual(f.calls[0].filters,[['not','status','in','(cancelled,completed)'],['lt','scheduled_at',until.toISOString()],['or','scheduled_end_at.gt.'+from.toISOString()+',and(scheduled_end_at.is.null,scheduled_at.gte.'+from.toISOString()+')']]);});
+test('cleaner query is explicitly scoped to assigned work',async()=>{const f=fixture([{data:[]}]);await loadScheduleBookings(f.db,'cleaner','cleaner-id',from,until);assert.ok(f.calls[0].filters.some(x=>x[0]==='eq'&&x[1]==='assigned_cleaner_id'&&x[2]==='cleaner-id'));});
+test('page failure rejects whole calendar instead of returning partial availability',async()=>{const f=fixture([{data:Array(500).fill({id:1})},{error:new Error('offline')}]);await assert.rejects(loadScheduleBookings(f.db,'admin','admin',from,until),/offline/);});
