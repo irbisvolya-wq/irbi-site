@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const {unitEconomics}=await import('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('finance-math.js','utf8')).toString('base64'));
+const base={jobs_completed:10,sales_value:15000,material_cost:1000,labor_cost:6000,direct_other_cost:500,operating_cost:2000};
+let d=unitEconomics(base);assert.equal(d.averageRevenue,1500);assert.equal(d.directPerJob,750);assert.equal(d.contributionPerJob,750);assert.equal(d.margin,50);assert.equal(d.overheadPerJob,200);assert.equal(d.resultPerJob,550);assert.equal(d.resultPerJob*d.jobs,d.result);
+assert.equal(unitEconomics({...base,jobs_completed:0}).averageRevenue,null);
+assert.equal(unitEconomics({...base,sales_value:0}).margin,null);
+assert.ok(unitEconomics({...base,labor_cost:20000}).contributionPerJob<0);
+assert.equal(unitEconomics({...base,labor_cost:null}),null);
+assert.equal(unitEconomics({...base,labor_cost:'unknown'}),null);
+assert.equal(unitEconomics({...base,jobs_completed:1.5}),null);
+assert.equal(unitEconomics({...base,jobs_completed:2,sales_value:10.01,material_cost:0,labor_cost:0,direct_other_cost:0,operating_cost:0}).averageRevenue,5.005);
+console.log('PASS: 8 unit-economics scenarios including reconciliation and unknown costs');
