@@ -175,7 +175,18 @@ const info=document.createElement("p");info.setAttribute("role","status");block.
  panel.append(block);
  }
 }
-async function action(id,kind,cleaner,info){info.textContent="Зберігаємо…";const {error}=await supabase.rpc("irbi_staff_action",{p_booking:id,p_action:kind,p_cleaner:cleaner,p_note:null});if(error){info.textContent=error.message;return;}await render();}
+const pendingActions=new Set();
+async function action(id,kind,cleaner,info){
+ if(pendingActions.has(id))return;
+ pendingActions.add(id);info.textContent="Зберігаємо…";
+ try{
+  const {error}=await supabase.rpc("irbi_staff_action",{p_booking:id,p_action:kind,p_cleaner:cleaner,p_note:null});
+  if(error){const known={cleaner_unavailable:"Клінер позначив цей час як недоступний.",duration_required_for_assignment:"Спочатку погодьте тривалість прибирання.",required_checklist_incomplete:"Завершіть обов’язкові пункти чек-листа.",invalid_transition:"Статус уже змінився. Оновіть сторінку.",not_assigned:"Це замовлення вам не призначено."};info.textContent=error.code==='23P01'?"На цей час у клінера вже є замовлення.":known[error.message]||"Не вдалося виконати дію. Оновіть замовлення й перевірте його стан.";return;}
+  info.textContent="Дію збережено.";
+  try{await render();}catch{info.textContent="Дію збережено. Оновіть сторінку для перевірки нового стану.";}
+ }catch{info.textContent="Збереження не підтверджено. Перевірте актуальний статус перед повторною дією.";}
+ finally{pendingActions.delete(id);}
+}
 async function showChecklist(id,block,info){
  const prev=block.querySelector(".items");if(prev){prev.remove();return;}
  const holder=document.createElement("div");holder.className="items";holder.style.marginTop="12px";block.append(holder);
