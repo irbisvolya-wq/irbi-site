@@ -8,6 +8,8 @@ const addonsList=["balcony","fridge","oven","cabinets"];
 const requestParams=new URLSearchParams(location.search);
 let submitting=false;
 let activeDraftKey;
+let requestToken;
+let requestTokenKey;
 
 const draftFields=["service","rooms","propertyType","bathrooms","area","frequency"];
 const draftLifetime=30*60*1000;
@@ -77,15 +79,16 @@ $("#requestForm").addEventListener("submit",async event=>{
  const addons={};for(const key of addonsList)addons[key]=$("#"+key).checked;
  const args={p_service:$("#service").value,p_rooms:Number($("#rooms").value),p_scheduled_at:dt.toISOString(),p_address:$("#address").value.trim(),p_property_type:$("#propertyType").value,p_bathrooms:Number($("#bathrooms").value),p_area_m2:Number($("#area").value),p_phone:$("#phone").value.trim(),p_apartment:$("#apartment").value.trim(),p_entrance:$("#entrance").value.trim(),p_floor:$("#floor").value.trim(),p_access_notes:$("#notes").value.trim(),p_frequency:$("#frequency").value,p_addons:addons};
  try{
-  const {data,error}=await db.rpc("irbi_customer_request",args);
+  const {data,error}=await db.rpc("irbi_customer_request_once",{p_request_id:requestToken,p_request:args});
   if(error)throw error;
+  try{sessionStorage.removeItem(requestTokenKey);}catch{}
   clearDraft(activeDraftKey);
   activeDraftKey=null;
   $("#content").classList.add("hide");$("#success").classList.remove("hide");
   $("#receipt").textContent="Номер запиту: "+String(data).slice(0,8);
   message("Запит збережено в IRBI.");
  }catch(err){
-  message("Запит не збережено: "+(err.message||"Помилка з’єднання"));
+  message(err.message==="request_changed"?"Попередній запит уже збережено з іншими параметрами. Перевірте його в кабінеті перед створенням нового.":"Не вдалося підтвердити збереження. Повторіть запит з тими самими даними — система перевірить, чи його вже створено.");
   submitting=false;
   quote();
  }
@@ -123,6 +126,10 @@ async function init(){
   }
  }
  activeDraftKey=draftKey(user.id);
+ requestTokenKey="irbi.booking.request:"+user.id;
+ try{requestToken=sessionStorage.getItem(requestTokenKey);}catch{}
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestToken||""))requestToken=crypto.randomUUID();
+ try{sessionStorage.setItem(requestTokenKey,requestToken);}catch{}
  if(restoreDraft(activeDraftKey))requestMessage="Відновлено параметри прибирання. Перевірте адресу й оберіть дату та час.";
  $("#content").classList.remove("hide");message(requestMessage);
  const tomorrow=new Date(Date.now()+12*3600*1000+60000);const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000);
