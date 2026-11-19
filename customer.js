@@ -55,7 +55,7 @@ async function loadHistory(userId){
   field(body,agreed?"Погоджена вартість":"Попередня вартість",money(b.total));
   if(b.duration_minutes)field(body,"Планова тривалість",b.duration_minutes+" хв");
   if(agreed&&b.scheduled_end_at)field(body,"Планове завершення",date(b.scheduled_end_at));
-  if(b.status==="pending"){const reminder=document.createElement("p");reminder.textContent="Час і остаточна вартість ще потребують підтвердження IRBI.";body.append(reminder);}
+  if(b.status==="pending"){const reminder=document.createElement("p");reminder.textContent="Час і остаточна вартість ще потребують підтвердження IRBI.";body.append(reminder);if(b.scheduled_at&&new Date(b.scheduled_at)<new Date()){const overdue=document.createElement("p");overdue.className="notice";overdue.setAttribute("role","status");overdue.textContent="Бажаний час уже минув. Напишіть команді IRBI в переписці нижче, щоб погодити нову дату.";body.append(overdue);}}
   field(body,"Адреса",[b.address,b.apartment?"кв. "+b.apartment:"",b.entrance?"під’їзд "+b.entrance:"",b.floor?"поверх "+b.floor:""].filter(Boolean).join(", "));
   field(body,"Телефон",b.contact_phone);
   field(body,"Кімнати / санвузли",(b.rooms??"—")+" / "+(b.bathrooms??"—"));
