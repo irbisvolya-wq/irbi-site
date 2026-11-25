@@ -1,5 +1,6 @@
-export async function loadVisibleOrders(db,role,userId,visibleLimit=50){
+export async function loadVisibleOrders(db,role,userId,visibleLimit=50,orderId=null){
  if(!Number.isInteger(visibleLimit)||visibleLimit<1)throw new Error('invalid_limit');
+ if(orderId!==null&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId))throw new Error('invalid_order');
  const rows=[];
  while(rows.length<visibleLimit+1){
   const offset=rows.length;
@@ -8,6 +9,7 @@ export async function loadVisibleOrders(db,role,userId,visibleLimit=50){
    .order('created_at',{ascending:false}).order('id',{ascending:false});
   if(role==='cleaner')query=query.eq('assigned_cleaner_id',userId);
   if(role==='customer')query=query.eq('customer_id',userId);
+  if(orderId!==null)query=query.eq('id',orderId);
   const {data,error}=await query.range(offset,end);
   if(error)throw error;
   if(!Array.isArray(data))throw new Error('orders_unavailable');
