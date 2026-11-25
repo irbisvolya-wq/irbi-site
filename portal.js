@@ -1,4 +1,5 @@
-import {loadVisibleOrders} from "/order-list.js?v=20261125-1";
+import {mountBookingChanges} from "/booking-changes.js?v=20261125-1";
+import {loadVisibleOrders} from "/order-list.js?v=20261125-2";
 import {jobDetails} from "/job-details.js?v=20261119-1";
 import {loadScheduleBookings} from "/schedule.js?v=20261119-1";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.95.0";
@@ -167,12 +168,12 @@ const info=document.createElement("p");info.setAttribute("role","status");block.
  if(["admin","dispatcher"].includes(role)&&["pending","confirmed"].includes(b.status)&&!b.assigned_cleaner_id){
   const prepare=document.createElement("button");prepare.type="button";prepare.className="btn btn-secondary";prepare.textContent="Узгодити час і вартість";prepare.onclick=()=>showRequestConfirmation(b,block,info);block.append(prepare);
  }
- if(role!=="cleaner"&&["pending","confirmed","assigned"].includes(b.status)){
+ if(role!=="cleaner"&&b.status==="confirmed"&&!b.assigned_cleaner_id){
  const select=document.createElement("select");for(const c of cleaners){const o=document.createElement("option");o.value=c.id;o.textContent=c.full_name||c.id.slice(0,8);select.append(o);}if(b.assigned_cleaner_id)select.value=b.assigned_cleaner_id;
  const assign=document.createElement("button");assign.className="btn btn-secondary";assign.textContent="Призначити";assign.disabled=!cleaners.length||!b.duration_minutes||b.status==="pending";assign.onclick=()=>action(b.id,"assign",select.value,info);block.append(select,assign);
  }
  const next=statusNext[b.status];if(next){const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent=next[1];btn.onclick=()=>action(b.id,next[0],null,info);block.append(btn);}
- if(role!=="cleaner"&&["pending","confirmed","assigned"].includes(b.status)){
+ if(role!=="cleaner"&&b.status==="confirmed"&&!b.assigned_cleaner_id){
  const featureButton=document.createElement("button");featureButton.className="btn btn-secondary";featureButton.textContent="Налаштувати об’єкт";featureButton.style.margin="8px";featureButton.onclick=()=>showFeatures(b,block,info);block.append(featureButton);
  }
  if(role!=="cleaner"){const consent=document.createElement("button");consent.className="btn btn-secondary";consent.style.margin="8px";consent.textContent=b.photo_consent?"Скасувати згоду на фото":"Зафіксувати згоду на фото";consent.onclick=async()=>{if(!confirm(b.photo_consent?"Клієнт відкликав згоду на подальшу фотофіксацію?":"Ви отримали явну згоду клієнта на фотофіксацію об'єкта?"))return;const {error}=await supabase.rpc("irbi_photo_consent",{p_booking:b.id,p_consent:!b.photo_consent});if(error)info.textContent=error.message;else await render();};block.append(consent);}
@@ -180,6 +181,7 @@ const info=document.createElement("p");info.setAttribute("role","status");block.
  const review=document.createElement("button");review.className="btn btn-secondary";review.style.margin="8px";review.textContent="Інциденти";review.onclick=()=>showIssues(b.id,role,block,info);block.append(review);
  const issueButton=document.createElement("button");issueButton.className="btn btn-secondary";issueButton.textContent="Повідомити про проблему";issueButton.style.margin="8px";issueButton.onclick=()=>showIssue(b.id,block,info);block.append(issueButton);
  const checklist=document.createElement("button");checklist.className="btn btn-secondary";checklist.textContent="Чек-лист";checklist.style.margin="8px";checklist.onclick=()=>showChecklist(b.id,block,info);block.append(checklist);
+ mountBookingChanges({db:supabase,booking:b,role,userId:user.id,cleaners,block,refresh:render});
  panel.append(block);
  if(focusedOrderId===b.id&&new URLSearchParams(location.search).get("view")==="issues")await showIssues(b.id,role,block,info);
  }

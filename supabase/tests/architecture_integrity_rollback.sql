@@ -29,6 +29,7 @@ BEGIN
  PERFORM public.irbi_photo_consent(booking_id,true);
  PERFORM public.irbi_staff_set_features(booking_id,'{"fridge":true,"oven":false}');
  IF NOT EXISTS(SELECT 1 FROM public.bookings WHERE id=booking_id AND cleaning_features->'requested_addons'->>'fridge'='true' AND cleaning_features->>'quote_is_preliminary'='true') THEN RAISE EXCEPTION 'Object setup erased customer request metadata';END IF;
+ SELECT updated_at INTO stamp FROM public.bookings WHERE id=booking_id;
  PERFORM public.irbi_staff_confirm_request(booking_id,now()+interval '80 days',120,1200,stamp);
  PERFORM public.irbi_staff_action(booking_id,'assign',cleaner_id,'Single transition note');
  IF (SELECT count(*) FROM public.booking_status_history WHERE booking_status_history.booking_id=launch_order_cycle.booking_id AND status='assigned')<>1 THEN RAISE EXCEPTION 'Duplicate assignment history';END IF;

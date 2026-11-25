@@ -5,7 +5,7 @@ export async function loadVisibleOrders(db,role,userId,visibleLimit=50,orderId=n
  while(rows.length<visibleLimit+1){
   const offset=rows.length;
   const end=Math.min(offset+499,visibleLimit);
-  let query=db.from('bookings').select('id,scheduled_at,status,total,assigned_cleaner_id,service_type,rooms,bathrooms,area_m2,property_type,address,apartment,entrance,floor,contact_phone,access_notes,created_at,cleaning_features,photo_consent,duration_minutes,scheduled_end_at,updated_at')
+  let query=db.from('bookings').select('id,scheduled_at,status,total,assigned_cleaner_id,service_type,rooms,bathrooms,area_m2,property_type,address,apartment,entrance,floor,contact_phone,access_notes,created_at,cleaning_features,photo_consent,duration_minutes,scheduled_end_at,updated_at,departed_at,started_at')
    .order('created_at',{ascending:false}).order('id',{ascending:false});
   if(role==='cleaner')query=query.eq('assigned_cleaner_id',userId);
   if(role==='customer')query=query.eq('customer_id',userId);
