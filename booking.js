@@ -56,6 +56,9 @@ function applyCalculatorSelection(){
 }
 function quote(){
  const service=$("#service").value,rooms=Number($("#rooms").value);
+ const balcony=$("#balcony");
+ balcony.disabled=service==="move";
+ if(balcony.disabled)balcony.checked=false;
  const base=pricing[service]?.[rooms-1];
  if(base==null){$("#quote").textContent="Індивідуально";$("#send").disabled=true;$("#quoteNote").textContent="Для такого обсягу потрібно окремо узгодити вартість. Залиште контакт на головній сторінці.";return;}
  const addons=addonsList.reduce((acc,key)=>({...acc,[key]:$("#"+key).checked}),{});
@@ -73,6 +76,7 @@ $("#requestForm").addEventListener("submit",async event=>{
  const dt=new Date($("#scheduled").value);
  if(!Number.isFinite(dt.getTime())){message("Оберіть коректну дату.");return;}
  if(dt.getTime()<Date.now()+12*3600*1000){message("Оберіть дату щонайменше за 12 годин.");return;}
+ if(dt.getTime()>Date.now()+90*24*3600*1000){message("Оберіть дату не пізніше ніж через 90 днів.");return;}
  submitting=true;
  $("#send").disabled=true;
  message("Зберігаємо ваш запит…");
@@ -88,7 +92,8 @@ $("#requestForm").addEventListener("submit",async event=>{
   $("#receipt").textContent="Номер запиту: "+String(data).slice(0,8);
   message("Запит збережено в IRBI.");
  }catch(err){
-  message(err.message==="request_changed"?"Попередній запит уже збережено з іншими параметрами. Перевірте його в кабінеті перед створенням нового.":"Не вдалося підтвердити збереження. Повторіть запит з тими самими даними — система перевірить, чи його вже створено.");
+  const validationMessages=new Set(["Оберіть час від 12 годин до 90 днів наперед","Некоректна площа","Вкажіть повну адресу","Вкажіть контактний номер телефону","Некоректна кількість санвузлів","Вкажіть тип приміщення","Некоректна періодичність","Занадто довгі примітки"]);
+  message(validationMessages.has(err.message)?err.message:err.message==="customer_required"?"Сесію завершено. Увійдіть у клієнтський кабінет і повторіть запит.":err.message==="request_changed"?"Попередній запит уже збережено з іншими параметрами. Перевірте його в кабінеті перед створенням нового.":"Не вдалося підтвердити збереження. Повторіть запит з тими самими даними — система перевірить, чи його вже створено.");
   submitting=false;
   quote();
  }
@@ -133,6 +138,8 @@ async function init(){
  if(restoreDraft(activeDraftKey))requestMessage="Відновлено параметри прибирання. Перевірте адресу й оберіть дату та час.";
  $("#content").classList.remove("hide");message(requestMessage);
  const tomorrow=new Date(Date.now()+12*3600*1000+60000);const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000);
- $("#scheduled").min=local.toISOString().slice(0,16);quote();
+ $("#scheduled").min=local.toISOString().slice(0,16);
+ const latest=new Date(Date.now()+90*24*3600*1000);
+ $("#scheduled").max=new Date(latest.getTime()-latest.getTimezoneOffset()*60000).toISOString().slice(0,16);quote();
 }
 init().catch(e=>message(e.message));
