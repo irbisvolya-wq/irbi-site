@@ -14,10 +14,14 @@ const field=(parent,label,value)=>{
  p.append(b,document.createTextNode(String(value??"—")));parent.append(p);
 };
 let signedIn=false;
+let customerLoadVersion=0,historyLoadVersion=0;
 async function loadCustomer(){
+ const version=++customerLoadVersion;
  const {data:{user},error}=await db.auth.getUser();
+ if(version!==customerLoadVersion)return;
  if(error||!user){signedIn=false;hide();return;}
  const {data:profile,error:pe}=await db.from("profiles").select("role,full_name,phone").eq("id",user.id).maybeSingle();
+ if(version!==customerLoadVersion)return;
  if(pe||profile?.role!=="customer"){signedIn=false;hide();return;}
  signedIn=true;
  $("#customerProfilePanel").classList.remove("hidden");
@@ -27,15 +31,18 @@ async function loadCustomer(){
  await loadHistory(user.id);
 }
 function hide(){
+ ++historyLoadVersion;
  $("#customerProfilePanel").classList.add("hidden");
  $("#customerHistoryPanel").classList.add("hidden");
  $("#customerHistory").replaceChildren();
 }
 async function loadHistory(userId){
+ const version=++historyLoadVersion;
  note("Завантаження заявок…");
  const {data,error}=await db.from("bookings")
  .select("id,service_type,status,scheduled_at,rooms,bathrooms,area_m2,property_type,address,apartment,entrance,floor,access_notes,contact_phone,total,frequency,cleaning_features,created_at,cancellation_reason,duration_minutes,scheduled_end_at")
  .eq("customer_id",userId).order("created_at",{ascending:false}).limit(100);
+ if(version!==historyLoadVersion)return;
  if(error){note("Не вдалося завантажити історію: "+error.message);return;}
  const root=$("#customerHistory");root.replaceChildren();
  if(!data?.length){note("Заявок поки немає.");return;}
@@ -100,7 +107,7 @@ async function loadHistory(userId){
    history.replaceChildren();chatStatus.textContent=data?.length?"":"Повідомлень ще немає.";
    for(const m of (data||[]).reverse()){const p=document.createElement("p");p.style.cssText="padding:9px;border-radius:8px;background:#eaf4ed;margin:8px 0";p.textContent=(m.audience==="staff"?"Ви":"Команда IRBI")+" · "+date(m.created_at)+" — "+m.body;history.append(p);}
   }
-  details.addEventListener("toggle",()=>{if(details.open)refreshChat();});
+  details.addEventListener("toggle",()=>{if(details.open)refreshChat().catch(()=>{chatStatus.textContent="Не вдалося завантажити переписку. Закрийте й відкрийте деталі заявки, щоб повторити спробу.";});});
   form.addEventListener("submit",async e=>{
    e.preventDefault();if(send.disabled||!input.value.trim())return;
    send.disabled=true;input.disabled=true;chatStatus.textContent="Надсилаємо…";
@@ -109,7 +116,7 @@ async function loadHistory(userId){
     if(error)throw error;
     input.value="";
     try{await refreshChat();}catch{chatStatus.textContent="Повідомлення надіслано. Оновіть заявку, щоб завантажити переписку.";}
-   }catch{chatStatus.textContent="Не вдалося надіслати повідомлення. Текст збережено у полі — повторіть спробу.";}
+   }catch{chatStatus.textContent="Не вдалося надіслати повідомлення. Текст збережено у полі. Перевірте переписку перед повторним надсиланням, щоб не створити дублікат.";}
    finally{send.disabled=false;input.disabled=false;}
   });
   chat.append(form);body.append(chat);
