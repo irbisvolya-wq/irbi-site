@@ -1,0 +1,9 @@
+# Existing deployed Edge Function verification settings, captured 2026-11-25.
+[functions.irbi-prelaunch-lead]
+verify_jwt = false
+
+[functions.irbi-assistant]
+verify_jwt = false
+
+[functions.google-places-autocomplete]
+verify_jwt = true

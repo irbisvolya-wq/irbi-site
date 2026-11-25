@@ -1,0 +1,77 @@
+BEGIN;
+DO $test$
+<<launch_order_cycle>>
+DECLARE other_customer uuid:=gen_random_uuid(); other_booking uuid; customer_id uuid; cleaner_id uuid; admin_id uuid; dispatcher_id uuid; booking_id uuid; item_id uuid; stamp timestamptz; request jsonb; result text; summary record;
+BEGIN
+ customer_id:=gen_random_uuid();cleaner_id:=gen_random_uuid();admin_id:=gen_random_uuid();dispatcher_id:=gen_random_uuid();
+ INSERT INTO auth.users(id,raw_user_meta_data) VALUES
+ (other_customer,'{"full_name":"IRBI rollback outsider"}'),(customer_id,'{"full_name":"IRBI rollback customer"}'),(cleaner_id,'{"full_name":"IRBI rollback cleaner"}'),
+ (admin_id,'{"full_name":"IRBI rollback admin"}'),(dispatcher_id,'{"full_name":"IRBI rollback dispatcher"}');
+ UPDATE public.profiles SET role='cleaner' WHERE id=cleaner_id;
+ UPDATE public.profiles SET role='admin' WHERE id=admin_id;
+ UPDATE public.profiles SET role='dispatcher' WHERE id=dispatcher_id;
+ PERFORM set_config('request.jwt.claim.sub',customer_id::text,true);
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',customer_id,'role','authenticated')::text,true);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ request:=jsonb_build_object('p_service','regular','p_rooms',1,'p_scheduled_at',now()+interval '80 days','p_address','IRBI rollback-only full order cycle','p_property_type','apartment','p_bathrooms',1,'p_area_m2',35,'p_phone','+380000000000','p_apartment','','p_entrance','','p_floor','','p_access_notes','','p_frequency','once','p_addons','{"fridge":true}'::jsonb);
+ PERFORM set_config('request.jwt.claim.sub',other_customer::text,true);
+ other_booking:=public.irbi_customer_request_once(gen_random_uuid(),request);
+ PERFORM set_config('request.jwt.claim.sub',customer_id::text,true);
+ IF EXISTS(SELECT 1 FROM public.bookings WHERE id=other_booking) THEN RAISE EXCEPTION 'Customer reads another customer booking';END IF;
+ result:=null;
+ BEGIN PERFORM public.irbi_customer_cancel_request(other_booking);EXCEPTION WHEN OTHERS THEN result:=sqlerrm;END;
+ IF result IS NULL THEN RAISE EXCEPTION 'Customer cancels another customer booking';END IF;
+ booking_id:=public.irbi_customer_request_once(gen_random_uuid(),request);
+ IF (SELECT status FROM public.bookings WHERE id=booking_id)<>'pending' THEN RAISE EXCEPTION 'Request not pending';END IF;
+ PERFORM set_config('request.jwt.claim.sub',dispatcher_id::text,true);
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',dispatcher_id,'role','authenticated')::text,true);
+ SELECT updated_at INTO stamp FROM public.bookings WHERE id=booking_id;
+ PERFORM public.irbi_photo_consent(booking_id,true);
+ PERFORM public.irbi_staff_set_features(booking_id,'{"fridge":true,"oven":false}');
+ IF NOT EXISTS(SELECT 1 FROM public.bookings WHERE id=booking_id AND cleaning_features->'requested_addons'->>'fridge'='true' AND cleaning_features->>'quote_is_preliminary'='true') THEN RAISE EXCEPTION 'Object setup erased customer request metadata';END IF;
+ PERFORM public.irbi_staff_confirm_request(booking_id,now()+interval '80 days',120,1200,stamp);
+ PERFORM public.irbi_staff_action(booking_id,'assign',cleaner_id,'Single transition note');
+ IF (SELECT count(*) FROM public.booking_status_history WHERE booking_status_history.booking_id=launch_order_cycle.booking_id AND status='assigned')<>1 THEN RAISE EXCEPTION 'Duplicate assignment history';END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.booking_status_history WHERE booking_status_history.booking_id=launch_order_cycle.booking_id AND status='assigned' AND note='Single transition note') THEN RAISE EXCEPTION 'Transition note lost';END IF;
+ PERFORM set_config('request.jwt.claim.sub',cleaner_id::text,true);
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',cleaner_id,'role','authenticated')::text,true);
+ PERFORM public.irbi_staff_action(booking_id,'accept',null,null);
+ PERFORM public.irbi_staff_action(booking_id,'depart',null,null);
+ PERFORM public.irbi_staff_action(booking_id,'arrive',null,null);
+ PERFORM public.irbi_staff_action(booking_id,'start',null,null);
+ result:=null;
+ BEGIN PERFORM public.irbi_staff_action(booking_id,'finish',null,null);EXCEPTION WHEN OTHERS THEN result:=sqlerrm;END;
+ IF result IS NULL THEN RAISE EXCEPTION 'Finished without checklist';END IF;
+ FOR item_id IN SELECT id FROM public.booking_checklist_items WHERE booking_checklist_items.booking_id=launch_order_cycle.booking_id LOOP
+  PERFORM public.irbi_checklist_resolve(item_id,'done',null);
+ END LOOP;
+ PERFORM public.irbi_staff_action(booking_id,'finish',null,null);
+ PERFORM set_config('request.jwt.claim.sub',admin_id::text,true);
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
+ PERFORM public.irbi_record_manual_payment(gen_random_uuid(),booking_id,1200,'cash',now(),'Rollback test cash');
+ PERFORM public.irbi_admin_payroll_action(booking_id,cleaner_id,'cleaning',600,'approve','Rollback test earning');
+ SELECT * INTO summary FROM public.irbi_booking_finance WHERE irbi_booking_finance.booking_id=launch_order_cycle.booking_id;
+ IF summary.paid_revenue<>1200 OR summary.labor_cost<>600 OR summary.planned_contribution<>600 THEN RAISE EXCEPTION 'Finance reconciliation failed';END IF;
+ PERFORM public.irbi_admin_payroll_action(booking_id,cleaner_id,'cleaning',600,'paid','Rollback test paid');
+ PERFORM set_config('request.jwt.claim.sub',cleaner_id::text,true);
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',cleaner_id,'role','authenticated')::text,true);
+ IF NOT EXISTS(SELECT 1 FROM public.cleaner_earnings WHERE cleaner_earnings.booking_id=launch_order_cycle.booking_id AND status='paid' AND amount=600) THEN RAISE EXCEPTION 'Cleaner cannot see earnings';END IF;
+ IF (SELECT count(*) FROM public.booking_status_history WHERE booking_status_history.booking_id=launch_order_cycle.booking_id)<>8 THEN RAISE EXCEPTION 'Each transition must have one history entry';END IF;
+ PERFORM set_config('request.jwt.claim.sub',customer_id::text,true);
+ result:=null;
+ BEGIN UPDATE public.bookings SET total=1,subtotal=1 WHERE id=booking_id;EXCEPTION WHEN insufficient_privilege THEN result:='denied';END;
+ IF result IS DISTINCT FROM 'denied' THEN RAISE EXCEPTION 'Customer can bypass price RPC';END IF;
+ result:=null;
+ BEGIN UPDATE public.profiles SET role='admin' WHERE id=customer_id;EXCEPTION WHEN insufficient_privilege THEN result:='denied';END;
+ IF result IS DISTINCT FROM 'denied' THEN RAISE EXCEPTION 'Customer can elevate role';END IF;
+ PERFORM set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
+ result:=null;
+ BEGIN PERFORM public.irbi_photo_consent(booking_id,true);EXCEPTION WHEN OTHERS THEN result:=sqlerrm;END;
+ IF result IS DISTINCT FROM 'forbidden' THEN RAISE EXCEPTION 'Missing profile bypasses photo consent authorization';END IF;
+ result:=null;
+ BEGIN PERFORM public.irbi_register_photo(booking_id,'x','before',null,null);EXCEPTION WHEN OTHERS THEN result:=sqlerrm;END;
+ IF result IS DISTINCT FROM 'forbidden' THEN RAISE EXCEPTION 'Missing profile bypasses photo authorization';END IF;
+ EXECUTE 'RESET ROLE';
+END $test$;
+SELECT 'PASS: isolated order cycle, request metadata, single history, financial reconciliation and access denials' AS result;
+ROLLBACK;
